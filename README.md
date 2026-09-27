@@ -86,8 +86,8 @@ Then commit and push, and CI builds a new AAB. In AdMob, also set up **Privacy &
 
 ## Android build
 
-- Capacitor 7, appId **`com.offerpk.ballsort`**, name **Ball Sort Puzzle**
-- `compileSdk`/`targetSdk` **35**, `minSdk` 23, versionCode **1**, versionName **1.0.0** (in `android/app/build.gradle`)
+- Capacitor 8, appId **`com.offerpk.ballsort`**, name **Ball Sort Puzzle**
+- `compileSdk`/`targetSdk` **36** (Android 16, which Google Play requires for new apps and updates since Aug 31 2026), `minSdk` 24, versionCode **1**, versionName **1.0.0** (in `android/app/build.gradle`)
 
 ### CI (GitHub Actions)
 
