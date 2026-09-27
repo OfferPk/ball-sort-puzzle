@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Android build outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/local.properties
+android/.idea/
+*.apk
+*.aab
+*.ap_
+dist/
+
+# Signing – NEVER commit keystores or their passwords
+*.jks
+*.keystore
+*.p12
+keystore.properties
+*keystore*.txt
+ballsort-upload.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/

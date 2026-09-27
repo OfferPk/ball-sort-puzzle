@@ -1,0 +1,20 @@
+{
+  "name": "ball-sort-puzzle",
+  "version": "1.0.0",
+  "description": "Offline Ball Sort Puzzle game (vanilla JS) with a Capacitor Android build and AdMob.",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "serve": "npx --yes http-server www -p 8080 -c-1",
+    "test": "node test/logic.test.js",
+    "sync": "npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-community/admob": "7.2.0",
+    "@capacitor/android": "^7.6.0",
+    "@capacitor/core": "^7.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.0"
+  }
+}

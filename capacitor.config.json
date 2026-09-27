@@ -1,0 +1,11 @@
+{
+  "appId": "com.offerpk.ballsort",
+  "appName": "Ball Sort Puzzle",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#2b1055"
+  },
+  "plugins": {
+    "AdMob": {}
+  }
+}

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2b1055" />
+  <meta name="description" content="Ball Sort Puzzle – a relaxing, offline color sorting puzzle game. Pour the balls until every tube holds a single color." />
+  <title>Ball Sort Puzzle</title>
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-restart" aria-label="Restart level" title="Restart">
+        <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+      </button>
+      <div class="level-box">
+        <div class="level-label">LEVEL</div>
+        <div class="level-num" id="level-num">1</div>
+      </div>
+      <button class="icon-btn" id="btn-settings" aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24"><path d="M19.4 13a7.8 7.8 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.8 7.8 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.9a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+      </button>
+    </header>
+
+    <div class="subbar"><span id="moves">Moves: 0</span><span id="colors-info"></span></div>
+
+    <main id="board" aria-label="Game board"></main>
+
+    <div id="toast" class="toast" role="status"></div>
+
+    <footer class="toolbar">
+      <button class="tool-btn" id="btn-undo">
+        <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62A7.97 7.97 0 0 1 20.1 16l2.37-.78A10.5 10.5 0 0 0 12.5 8z"/></svg>
+        <span class="tool-label">Undo</span>
+        <span class="badge" id="undo-badge">3</span>
+      </button>
+      <button class="tool-btn" id="btn-tube">
+        <svg viewBox="0 0 24 24"><path d="M8 2h8v2h-1v14a3 3 0 0 1-6 0V4H8zm3 2v6h2V4z"/><path d="M19 9h2v2h2v2h-2v2h-2v-2h-2v-2h2z"/></svg>
+        <span class="tool-label">+1 Tube</span>
+        <span class="badge ad" id="tube-badge">AD</span>
+      </button>
+    </footer>
+  </div>
+
+  <!-- Win overlay -->
+  <div class="overlay hidden" id="win">
+    <canvas id="confetti"></canvas>
+    <div class="card win-card">
+      <div class="trophy">🏆</div>
+      <h2 id="win-title">Level Complete!</h2>
+      <p id="win-sub">Solved in 0 moves</p>
+      <button class="big-btn" id="btn-next">Next Level ▸</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="overlay hidden" id="settings">
+    <div class="card">
+      <h2>Settings</h2>
+      <label class="row"><span>Sound effects</span><input type="checkbox" id="opt-sound" class="switch" /></label>
+      <label class="row"><span>Vibration</span><input type="checkbox" id="opt-vibrate" class="switch" /></label>
+      <div class="row"><span>How to play</span></div>
+      <p class="help">Tap a tube to pick up its top ball(s), then tap another tube to pour. Balls can only be poured onto the same color or into an empty tube. Sort every color into its own tube to win!</p>
+      <div class="row buttons">
+        <button class="small-btn danger" id="btn-reset">Reset progress</button>
+        <a class="small-btn" href="privacy.html" target="_blank" rel="noopener">Privacy</a>
+      </div>
+      <button class="big-btn" id="btn-close-settings">Done</button>
+      <p class="version">Ball Sort Puzzle v1.0.0</p>
+    </div>
+  </div>
+
+  <script src="js/logic.js"></script>
+  <script src="js/ads-config.js"></script>
+  <script src="js/ads.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
