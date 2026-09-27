@@ -91,7 +91,7 @@ Then commit and push, and CI builds a new AAB. In AdMob, also set up **Privacy &
 
 ### CI (GitHub Actions)
 
-`.github/workflows/android.yml` runs on every push to `main`, on `v*` tags, and on manual dispatch. It runs Node 20 + JDK 21 → `npm ci` → logic tests → `npx cap sync android` → `./gradlew bundleRelease assembleRelease`. The signed **`.aab`** and **`.apk`** are uploaded as workflow artifacts. On a `v*` tag, the workflow also creates a **GitHub Release** with both files attached.
+`.github/workflows/android.yml` runs on every push to `main`, on `v*` tags, and on manual dispatch. It runs Node 22 + JDK 21 → `npm ci` → logic tests → `npx cap sync android` → `./gradlew bundleRelease assembleRelease`. The signed **`.aab`** and **`.apk`** are uploaded as workflow artifacts. On a `v*` tag, the workflow also creates a **GitHub Release** with both files attached.
 
 Signing uses these repository secrets:
 
