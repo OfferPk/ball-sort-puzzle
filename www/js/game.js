@@ -524,12 +524,12 @@
       (improved ? ' · New personal best!' : ' · Personal best: ' + previousBest + ' moves');
     $('next-challenge').textContent = nextChallenge(state.level);
     save();
-    setTimeout(function () {
-      Sound.win(); buzz(40);
-      $('win-title').textContent = 'Level ' + state.level + ' Complete!';
-      showModal('win');
-      confetti();
-    }, 350);
+    // Make the finished state modal immediately; a delay left the board and
+    // toolbar interactive long enough for a restart to precede the win dialog.
+    Sound.win(); buzz(40);
+    $('win-title').textContent = 'Level ' + state.level + ' Complete!';
+    showModal('win');
+    confetti();
   }
 
   function nextLevel() {

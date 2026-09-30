@@ -339,6 +339,36 @@ async function openTestPage() {
   }
   await page.click('#btn-replay'); await sleep(200);
   if ((await page.$eval('#next-challenge', el => el.textContent)) !== '') throw new Error('replaying a level left a stale progression preview visible to assistive technology');
+  // The result dialog must take over on the completing pour so a rapid toolbar
+  // tap cannot restart the solved board before its delayed completion UI opens.
+  await page.evaluate(() => window.__ballSort.startLevel(3, {
+    level: 3, tubes: [[0, 0], [0, 0], [1, 1, 1, 1], [2, 2, 2, 2], []],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  await tap(0); await tap(1); await waitIdle();
+  const immediateWin = await page.evaluate(() => ({
+    won: window.__ballSort.state.won,
+    visible: !document.getElementById('win').classList.contains('hidden'),
+    inert: document.getElementById('app').inert,
+    focus: document.activeElement.id
+  }));
+  if (!immediateWin.won || !immediateWin.visible || !immediateWin.inert || immediateWin.focus !== 'btn-next') {
+    throw new Error('completing a level left the board interactive before its win dialog appeared: ' + JSON.stringify(immediateWin));
+  }
+  let quickRestartPrompt = '';
+  const captureQuickRestart = async dialog => { quickRestartPrompt = dialog.message(); await dialog.dismiss(); };
+  page.on('dialog', captureQuickRestart);
+  await touch('#btn-restart');
+  page.off('dialog', captureQuickRestart);
+  const afterQuickRestart = await page.evaluate(() => ({
+    won: window.__ballSort.state.won, moves: window.__ballSort.state.moves,
+    visible: !document.getElementById('win').classList.contains('hidden')
+  }));
+  if (quickRestartPrompt || !afterQuickRestart.won || afterQuickRestart.moves !== 1 || !afterQuickRestart.visible) {
+    throw new Error('a quick restart tap escaped the completion dialog: ' + JSON.stringify({ quickRestartPrompt, afterQuickRestart }));
+  }
+  console.log('win dialog locks the solved board immediately and blocks a rapid restart tap');
+  await page.click('#btn-replay'); await sleep(200);
   await page.evaluate(() => window.__ballSort.startLevel(1));
 
   // Selecting a source immediately marks every legal destination visually and
@@ -473,7 +503,8 @@ async function openTestPage() {
 
   // play level 1 by taps
   const moves1 = await solveCurrent();
-  await assertTubeAccessibility('completed level');
+  // The win dialog immediately makes the game inert, so tube accessibility is
+  // verified during active play rather than through the modal's AX tree.
   await sleep(900);
   const won = await page.evaluate(() => window.__ballSort.state.won && !document.getElementById('win').classList.contains('hidden'));
   if (!won) throw new Error('level 1 win not detected');
