@@ -112,6 +112,12 @@ let browser = null;
   await page.keyboard.press('Enter');
   selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
   if (selected !== 'false') throw new Error('keyboard deselection did not update pressed state');
+  await page.keyboard.press('Space');
+  selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
+  if (selected !== 'true') throw new Error('Space did not activate tube selection');
+  await page.keyboard.press('Space');
+  selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
+  if (selected !== 'false') throw new Error('Space did not activate tube deselection');
 
   const keyboardMove = await page.evaluate(() => window.__ballSort.logic.solve(window.__ballSort.state.tubes)[0]);
   await page.focus(`.tube[data-index="${keyboardMove[0]}"]`);
