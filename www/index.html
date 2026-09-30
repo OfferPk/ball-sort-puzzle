@@ -8,7 +8,7 @@
   <title>Ball Sort Puzzle</title>
   <link rel="icon" type="image/png" href="icon.png" />
   <link rel="apple-touch-icon" href="icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=toast-wrap-20260930" />
+  <link rel="stylesheet" href="css/style.css?v=solver-move-stars-20260930" />
 </head>
 <body>
   <div id="app">
@@ -49,12 +49,13 @@
   </div>
 
   <!-- Win overlay -->
-  <div class="overlay hidden" id="win" role="dialog" aria-modal="true" aria-labelledby="win-title" aria-describedby="win-sub next-challenge" aria-hidden="true">
+  <div class="overlay hidden" id="win" role="dialog" aria-modal="true" aria-labelledby="win-title" aria-describedby="win-sub win-stars next-challenge" aria-hidden="true">
     <canvas id="confetti"></canvas>
     <div class="card win-card">
       <div class="trophy">🏆</div>
       <h2 id="win-title">Level Complete!</h2>
       <p id="win-sub">Solved in 0 moves</p>
+      <p id="win-stars" class="win-stars" role="status" aria-live="polite" aria-atomic="true"></p>
       <p id="next-challenge" class="next-challenge"></p>
       <button class="big-btn" id="btn-next">Next Level ▸</button>
       <button class="small-btn replay-btn" id="btn-replay" type="button">Replay Level</button>
@@ -92,6 +93,6 @@
   <script src="js/ads-config.js"></script>
   <script src="js/ads.js"></script>
   <script src="js/sound.js"></script>
-  <script src="js/game.js?v=settings-move-guard-20260930"></script>
+  <script src="js/game.js?v=solver-move-stars-20260930"></script>
 </body>
 </html>

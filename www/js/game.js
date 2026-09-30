@@ -33,6 +33,8 @@
     extraUsed: false,
     moves: 0,
     bestMoves: {},
+    bestStars: {},
+    moveTargets: null,
     unlockedLevel: 1,
     selected: -1,
     busy: false,
@@ -45,7 +47,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         level: state.won ? state.level + 1 : state.level, settings: state.settings,
-        bestMoves: state.bestMoves, unlockedLevel: state.unlockedLevel,
+        bestMoves: state.bestMoves, bestStars: state.bestStars, unlockedLevel: state.unlockedLevel,
         current: state.won ? null : { level: state.level, tubes: state.tubes, history: state.history, undos: state.undos, extraUsed: state.extraUsed, moves: state.moves }
       }));
     } catch (e) {}
@@ -60,6 +62,16 @@
       var number = Number(level), moves = value[level];
       if (number > 0 && Math.floor(number) === number && String(number) === level &&
           typeof moves === 'number' && isFinite(moves) && moves >= 0 && Math.floor(moves) === moves) clean[level] = moves;
+    });
+    return clean;
+  }
+  function cleanBestStars(value) {
+    var clean = {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return clean;
+    Object.keys(value).forEach(function (level) {
+      var number = Number(level), stars = value[level];
+      if (number > 0 && Math.floor(number) === number && String(number) === level &&
+          typeof stars === 'number' && isFinite(stars) && Math.floor(stars) === stars && stars >= 1 && stars <= 3) clean[level] = stars;
     });
     return clean;
   }
@@ -79,6 +91,8 @@
     state.won = false;
     state.busy = false;
     $('next-challenge').textContent = '';
+    var lv = L.generateLevel(level);
+    state.moveTargets = lv.moveTargets || null;
     if (resume && resume.level === level && resume.tubes && resume.tubes.length) {
       state.tubes = resume.tubes;
       state.history = resume.history || [];
@@ -86,7 +100,6 @@
       state.extraUsed = !!resume.extraUsed;
       state.moves = resume.moves || 0;
     } else {
-      var lv = L.generateLevel(level);
       state.tubes = L.clone(lv.tubes);
       state.history = [];
       state.undos = FREE_UNDOS;
@@ -493,6 +506,15 @@
           label += ', current level';
         }
         if (typeof best === 'number') label += ', personal best ' + best + ' moves';
+        var stars = state.bestStars[number];
+        if (typeof stars === 'number' && stars >= 1 && stars <= 3) {
+          var starBadge = document.createElement('span');
+          starBadge.className = 'level-option-stars';
+          starBadge.setAttribute('aria-hidden', 'true');
+          starBadge.textContent = '★'.repeat(stars);
+          button.appendChild(starBadge);
+          label += ', best rating ' + stars + ' star' + (stars === 1 ? '' : 's');
+        }
         button.setAttribute('aria-label', label);
         button.addEventListener('click', function () { chooseLevel(number); });
         list.appendChild(button);
@@ -520,6 +542,30 @@
     var previousBest = state.bestMoves[state.level];
     var improved = typeof previousBest !== 'number' || state.moves < previousBest;
     if (improved) state.bestMoves[state.level] = state.moves;
+    var earnedStars = L.starsForMoves(state.moves, state.moveTargets);
+    var previousStars = state.bestStars[state.level] || 0;
+    if (earnedStars > previousStars) state.bestStars[state.level] = earnedStars;
+    var bestStars = Math.max(previousStars, earnedStars);
+    var starStatus = $('win-stars');
+    starStatus.textContent = '';
+    starStatus.classList.toggle('no-stars', earnedStars === 0);
+    if (!state.moveTargets) {
+      starStatus.textContent = 'Move-efficiency stars unavailable: no verified target for this level.';
+    } else {
+      if (earnedStars > 0) {
+        var starGlyphs = document.createElement('span');
+        starGlyphs.className = 'win-star-glyphs';
+        starGlyphs.setAttribute('aria-hidden', 'true');
+        starGlyphs.textContent = '★'.repeat(earnedStars);
+        starStatus.appendChild(starGlyphs);
+        starStatus.appendChild(document.createTextNode(' '));
+        starStatus.appendChild(document.createTextNode('Earned ' + earnedStars + ' star' + (earnedStars === 1 ? '' : 's') + '. '));
+      } else {
+        starStatus.appendChild(document.createTextNode('No efficiency stars this time. '));
+      }
+      if (bestStars > earnedStars) starStatus.appendChild(document.createTextNode('Best: ' + bestStars + ' stars. '));
+      starStatus.appendChild(document.createTextNode('Targets: 3 stars ≤ ' + state.moveTargets.three + ', 2 ≤ ' + state.moveTargets.two + ', 1 ≤ ' + state.moveTargets.one + ' moves.'));
+    }
     $('win-sub').textContent = 'Solved in ' + state.moves + ' move' + (state.moves === 1 ? '' : 's') +
       (improved ? ' · New personal best!' : ' · Personal best: ' + previousBest + ' moves');
     $('next-challenge').textContent = nextChallenge(state.level);
@@ -649,6 +695,7 @@
     if (!confirm('Reset all progress and go back to level 1?')) return;
     hideModal('settings', true);
     state.bestMoves = {};
+    state.bestStars = {};
     state.unlockedLevel = 1;
     startLevel(1);
   });
@@ -692,6 +739,7 @@
   var saved = load();
   if (saved && saved.settings) state.settings = Object.assign(state.settings, saved.settings);
   state.bestMoves = cleanBestMoves(saved && saved.bestMoves);
+  state.bestStars = cleanBestStars(saved && saved.bestStars);
   state.unlockedLevel = cleanUnlockedLevel(saved);
   applySettings();
   var params = new URLSearchParams(location.search);

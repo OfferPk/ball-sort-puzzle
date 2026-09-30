@@ -19,11 +19,25 @@ for (const n of levels) {
   // play the solver's solution with the game's own rules
   const sol = L.solve(a.tubes, { nodeLimit: 500000 });
   assert.ok(sol, 'level ' + n + ' solvable');
+  assert.strictEqual(a.solutionLength, sol.length, 'level ' + n + ' star target uses the current puzzle solution');
+  assert.deepStrictEqual(a.moveTargets, {
+    one: Math.floor(sol.length * 2), two: Math.floor(sol.length * 1.5), three: sol.length
+  }, 'level ' + n + ' exposes solver-verified, ordered move targets');
+  assert.strictEqual(L.starsForMoves(a.moveTargets.three, a.moveTargets), 3);
+  assert.strictEqual(L.starsForMoves(a.moveTargets.three + 1, a.moveTargets), 2);
+  assert.strictEqual(L.starsForMoves(a.moveTargets.two, a.moveTargets), 2);
+  assert.strictEqual(L.starsForMoves(a.moveTargets.two + 1, a.moveTargets), 1);
+  assert.strictEqual(L.starsForMoves(a.moveTargets.one, a.moveTargets), 1);
+  assert.strictEqual(L.starsForMoves(a.moveTargets.one + 1, a.moveTargets), 0);
+  assert.strictEqual(L.starsForMoves(0, a.moveTargets), 0);
   const tubes = L.clone(a.tubes);
   for (const [f, t] of sol) assert.ok(L.pour(tubes, f, t) > 0, 'legal move');
   assert.ok(L.isWon(tubes), 'level ' + n + ' solved');
   console.log(`level ${String(n).padStart(4)}: ${a.colors} colors, ${a.tubes.length} tubes, solved in ${sol.length} moves (gen ${Date.now() - s} ms)`);
 }
+assert.strictEqual(L.starsForMoves(5, null), 0, 'missing solver targets never award stars');
+assert.strictEqual(L.starsForMoves(5, { one: 4, two: 5, three: 6 }), 0, 'unordered targets never award stars');
+assert.strictEqual(L.starsForMoves(3, { one: 5, two: 4, three: 3 }), 0, 'ordered but unverified targets never award stars');
 // rule checks
 const t = [[0, 1], [1], [], [2, 2, 2, 2]];
 assert.strictEqual(L.pourCount(t, 0, 1), 1);   // same color

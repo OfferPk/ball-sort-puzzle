@@ -132,6 +132,20 @@
     return dfs() ? path : null;
   }
 
+  /** Score a completed run against targets derived from a verified solver path. */
+  function starsForMoves(moves, targets) {
+    if (typeof moves !== 'number' || !isFinite(moves) || Math.floor(moves) !== moves || moves < 1 ||
+        !targets || typeof targets !== 'object') return 0;
+    var one = targets.one, two = targets.two, three = targets.three;
+    if ([one, two, three].some(function (value) {
+      return typeof value !== 'number' || !isFinite(value) || Math.floor(value) !== value || value < 1;
+    }) || three > two || two > one || two !== Math.floor(three * 1.5) || one !== Math.floor(three * 2)) return 0;
+    if (moves <= three) return 3;
+    if (moves <= two) return 2;
+    if (moves <= one) return 1;
+    return 0;
+  }
+
   /**
    * Generate level N. Deterministic: the level number is the seed.
    * Balls are shuffled randomly, then verified with the solver; if a
@@ -156,7 +170,15 @@
       if (bad) continue;
       var sol = solve(tubes);
       if (sol && sol.length >= colors) {
-        return { level: level, colors: colors, capacity: CAPACITY, tubes: tubes, solutionLength: sol.length, seedAttempt: attempt };
+        // The three-star limit is an achievable, solver-verified route for this
+        // exact seeded board; the wider bands reward progressively looser play.
+        var threeStarMoves = sol.length;
+        return {
+          level: level, colors: colors, capacity: CAPACITY, tubes: tubes,
+          solutionLength: sol.length,
+          moveTargets: { one: Math.floor(threeStarMoves * 2), two: Math.floor(threeStarMoves * 1.5), three: threeStarMoves },
+          seedAttempt: attempt
+        };
       }
     }
     throw new Error('Could not generate level ' + level);
@@ -166,6 +188,6 @@
     CAPACITY: CAPACITY, EMPTY_TUBES: EMPTY_TUBES, MAX_COLORS: MAX_COLORS,
     rng: rng, colorsForLevel: colorsForLevel, topRun: topRun, isComplete: isComplete,
     pourCount: pourCount, canPour: canPour, pour: pour, isWon: isWon, clone: clone,
-    solve: solve, generateLevel: generateLevel
+    solve: solve, starsForMoves: starsForMoves, generateLevel: generateLevel
   };
 });

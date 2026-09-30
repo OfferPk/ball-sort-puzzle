@@ -158,12 +158,16 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 .level-card { max-height: min(90vh, 680px); display: flex; flex-direction: column; }
 .level-card .help { margin-bottom: 4px; }
 .level-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex: 1; min-height: 0; gap: 8px; margin: 12px 0; padding: 3px; overflow-y: auto; overscroll-behavior: contain; }
-.level-option { min-width: 44px; min-height: 44px; height: 44px; border-radius: 12px; background: var(--glass); border: 1px solid var(--glass-border); font-weight: 700; }
+.level-option { min-width: 44px; min-height: 44px; height: 44px; border-radius: 12px; background: var(--glass); border: 1px solid var(--glass-border); font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.level-option-stars { color: #ffd166; font-size: 9px; letter-spacing: -1px; line-height: 1; }
 .level-option.current { color: #3d2400; background: linear-gradient(180deg, #ffd166, #f4a261); border-color: #ffd166; }
 .level-option[aria-current="step"] { box-shadow: 0 0 0 2px rgba(255,255,255,.45); }
 .overlay.hidden .card { transform: scale(.8); }
 .card h2 { margin: 6px 0 14px; }
 .win-card .trophy { font-size: 64px; animation: bounce 1.2s infinite; }
+.win-stars { margin: 0 0 12px; color: #fff; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.win-stars.no-stars { font-weight: 500; opacity: .9; }
+.win-star-glyphs { color: #ffd166; font-size: 20px; letter-spacing: 2px; vertical-align: -1px; }
 .win-card .next-challenge { margin: 0 0 8px; font-size: 14px; line-height: 1.35; color: rgba(255,255,255,.9); }
 @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 .big-btn {

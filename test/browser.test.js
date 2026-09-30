@@ -369,7 +369,12 @@ async function openTestPage() {
   }
   console.log('win dialog locks the solved board immediately and blocks a rapid restart tap');
   await page.click('#btn-replay'); await sleep(200);
-  await page.evaluate(() => window.__ballSort.startLevel(1));
+  await page.evaluate(() => {
+    window.__ballSort.state.bestMoves = {};
+    window.__ballSort.state.bestStars = {};
+    window.__ballSort.state.unlockedLevel = 1;
+    window.__ballSort.startLevel(1);
+  });
 
   // Selecting a source immediately marks every legal destination visually and
   // in each tube's accessible name, announces the choices, and never mutates a
@@ -536,12 +541,19 @@ async function openTestPage() {
   if (!won) throw new Error('level 1 win not detected');
   const firstBest = await page.evaluate(() => ({
     text: document.getElementById('win-sub').textContent,
+    stars: document.getElementById('win-stars').textContent,
+    starRole: document.getElementById('win-stars').getAttribute('role'),
     nextChallenge: document.getElementById('next-challenge').textContent,
     winDescribedby: document.getElementById('win').getAttribute('aria-describedby'),
     progress: document.getElementById('sort-progress').textContent,
     saved: JSON.parse(localStorage.getItem('ballsort.v1'))
   }));
-  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.nextChallenge !== 'Next: 3 colors · 4 colors at Level 4' || !firstBest.winDescribedby.split(' ').includes('next-challenge') || firstBest.progress !== 'Sorted: 3 / 3' || firstBest.saved.level !== 2 || firstBest.saved.unlockedLevel < firstBest.saved.level || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
+  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` ||
+      firstBest.stars !== `★★★ Earned 3 stars. Targets: 3 stars ≤ ${moves1}, 2 ≤ ${Math.ceil(moves1 * 1.5)}, 1 ≤ ${Math.ceil(moves1 * 2)} moves.` ||
+      firstBest.starRole !== 'status' || firstBest.nextChallenge !== 'Next: 3 colors · 4 colors at Level 4' ||
+      !firstBest.winDescribedby.split(' ').includes('win-stars') || !firstBest.winDescribedby.split(' ').includes('next-challenge') ||
+      firstBest.progress !== 'Sorted: 3 / 3' || firstBest.saved.level !== 2 || firstBest.saved.unlockedLevel !== 2 ||
+      firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1 || firstBest.saved.bestStars['1'] !== 3) {
     throw new Error('first level win did not record a personal best and save the next level immediately');
   }
   let winFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('win').getAttribute('aria-modal'), hidden: document.getElementById('win').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
@@ -572,8 +584,9 @@ async function openTestPage() {
     throw new Error('replay action did not restart the same level, reset its sorted count, and preserve personal-best progress');
   }
   const retryMoves = await solveCurrent(); await sleep(700);
-  const retryBest = await page.evaluate(() => ({ text: document.getElementById('win-sub').textContent, best: JSON.parse(localStorage.getItem('ballsort.v1')).bestMoves['1'] }));
-  if (retryMoves !== moves1 || retryBest.best !== moves1 || retryBest.text !== `Solved in ${moves1} moves · Personal best: ${moves1} moves`) {
+  const retryBest = await page.evaluate(() => ({ text: document.getElementById('win-sub').textContent, stars: document.getElementById('win-stars').textContent, best: JSON.parse(localStorage.getItem('ballsort.v1')).bestMoves['1'], bestStars: JSON.parse(localStorage.getItem('ballsort.v1')).bestStars['1'] }));
+  if (retryMoves !== moves1 || retryBest.best !== moves1 || retryBest.bestStars !== 3 ||
+      retryBest.text !== `Solved in ${moves1} moves · Personal best: ${moves1} moves` || !retryBest.stars.startsWith('★★★ Earned 3 stars.')) {
     throw new Error('replayed level did not preserve or accurately report the existing personal best');
   }
   console.log('win dialog replays the same level and preserves its personal-best record');
@@ -617,9 +630,13 @@ async function openTestPage() {
     levels: [...document.querySelectorAll('#level-list button')].map(button => Number(button.dataset.level)),
     current: document.querySelector('#level-list [aria-current="step"]')?.dataset.level,
     currentName: document.querySelector('#level-list [aria-current="step"]')?.getAttribute('aria-label'),
+    completedName: document.querySelector('#level-list [data-level="1"]')?.getAttribute('aria-label'),
+    completedStars: document.querySelector('#level-list [data-level="1"] .level-option-stars')?.textContent,
     focusedLevel: document.activeElement && document.activeElement.dataset.level
   }));
-  if (picker.hidden !== 'false' || !picker.inert || JSON.stringify(picker.levels) !== JSON.stringify([1, 2]) || picker.current !== '2' || !/current level/.test(picker.currentName || '') || picker.focusedLevel !== '2' || await page.$('#level-list [data-level="3"]')) {
+  if (picker.hidden !== 'false' || !picker.inert || JSON.stringify(picker.levels) !== JSON.stringify([1, 2]) || picker.current !== '2' ||
+      !/current level/.test(picker.currentName || '') || !/best rating 3 stars/.test(picker.completedName || '') ||
+      picker.completedStars !== '★★★' || picker.focusedLevel !== '2' || await page.$('#level-list [data-level="3"]')) {
     throw new Error('level picker did not expose only unlocked levels and mark the current level: ' + JSON.stringify(picker));
   }
   console.log('compact mobile level-picker options remain at least 44×44px');
@@ -1020,9 +1037,11 @@ async function openTestPage() {
   await page.click('#btn-settings'); await page.click('#btn-reset'); await sleep(100);
   const resetProgress = await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('ballsort.v1'));
-    return { level: window.__ballSort.state.level, unlocked: window.__ballSort.state.unlockedLevel, bestMoves: window.__ballSort.state.bestMoves, savedLevel: saved.level, savedUnlock: saved.unlockedLevel, savedBestMoves: saved.bestMoves };
+    return { level: window.__ballSort.state.level, unlocked: window.__ballSort.state.unlockedLevel, bestMoves: window.__ballSort.state.bestMoves, bestStars: window.__ballSort.state.bestStars, savedLevel: saved.level, savedUnlock: saved.unlockedLevel, savedBestMoves: saved.bestMoves, savedBestStars: saved.bestStars };
   });
-  if (resetProgress.level !== 1 || resetProgress.unlocked !== 1 || resetProgress.savedLevel !== 1 || resetProgress.savedUnlock !== 1 || Object.keys(resetProgress.bestMoves).length || Object.keys(resetProgress.savedBestMoves).length) {
+  if (resetProgress.level !== 1 || resetProgress.unlocked !== 1 || resetProgress.savedLevel !== 1 || resetProgress.savedUnlock !== 1 ||
+      Object.keys(resetProgress.bestMoves).length || Object.keys(resetProgress.savedBestMoves).length ||
+      Object.keys(resetProgress.bestStars).length || Object.keys(resetProgress.savedBestStars).length) {
     throw new Error('reset progress did not clear personal-best records along with level progress');
   }
   console.log('explicit progress reset clears personal-best records');
