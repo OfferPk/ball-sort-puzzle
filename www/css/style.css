@@ -156,7 +156,7 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 .level-card { max-height: min(90vh, 680px); display: flex; flex-direction: column; }
 .level-card .help { margin-bottom: 4px; }
 .level-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex: 1; min-height: 0; gap: 8px; margin: 12px 0; padding: 3px; overflow-y: auto; overscroll-behavior: contain; }
-.level-option { min-width: 0; height: 42px; border-radius: 12px; background: var(--glass); border: 1px solid var(--glass-border); font-weight: 700; }
+.level-option { min-width: 44px; min-height: 44px; height: 44px; border-radius: 12px; background: var(--glass); border: 1px solid var(--glass-border); font-weight: 700; }
 .level-option.current { color: #3d2400; background: linear-gradient(180deg, #ffd166, #f4a261); border-color: #ffd166; }
 .level-option[aria-current="step"] { box-shadow: 0 0 0 2px rgba(255,255,255,.45); }
 .overlay.hidden .card { transform: scale(.8); }
@@ -197,6 +197,7 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 }
 
 @media (max-width: 360px) {
+  .level-grid { grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); }
   .tool-btn { padding: 0 5px; gap: 4px; font-size: 14px; }
   .tool-btn svg { width: 21px; height: 21px; }
 }

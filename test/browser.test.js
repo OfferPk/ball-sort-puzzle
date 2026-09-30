@@ -478,6 +478,18 @@ async function openTestPage() {
   }, moves1);
   const pickerTrigger = await page.$eval('#btn-levels', button => ({ tag: button.tagName, type: button.type, name: button.getAttribute('aria-label') }));
   if (pickerTrigger.tag !== 'BUTTON' || pickerTrigger.type !== 'button' || pickerTrigger.name !== 'Choose a level; current level 2') throw new Error('level picker trigger is missing its current-level accessible name');
+  await page.setViewport({ width: 320, height: 480, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await page.click('#btn-levels');
+  await sleep(350);
+  const compactLevelTargets = await page.$$eval('#level-list .level-option', buttons => buttons.map(button => {
+    const rect = button.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  }));
+  if (!compactLevelTargets.length || compactLevelTargets.some(target => target.width < 44 || target.height < 44)) {
+    throw new Error('compact mobile level-picker options fell below 44×44px: ' + JSON.stringify(compactLevelTargets));
+  }
+  await page.keyboard.press('Escape');
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.click('#btn-levels');
   let picker = await page.evaluate(() => ({
     hidden: document.getElementById('levels').getAttribute('aria-hidden'),
@@ -489,6 +501,7 @@ async function openTestPage() {
   if (picker.hidden !== 'false' || !picker.inert || JSON.stringify(picker.levels) !== JSON.stringify([1, 2]) || picker.current !== '2' || !/current level/.test(picker.currentName || '') || await page.$('#level-list [data-level="3"]')) {
     throw new Error('level picker did not expose only unlocked levels and mark the current level: ' + JSON.stringify(picker));
   }
+  console.log('compact mobile level-picker options remain at least 44×44px');
   await sleep(350);
   await page.screenshot({ path: `${OUT}/ballsort-level-picker.png` });
   await page.keyboard.press('Escape');
