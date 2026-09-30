@@ -46,7 +46,7 @@
   </div>
 
   <!-- Win overlay -->
-  <div class="overlay hidden" id="win">
+  <div class="overlay hidden" id="win" role="dialog" aria-modal="true" aria-labelledby="win-title" aria-describedby="win-sub" aria-hidden="true">
     <canvas id="confetti"></canvas>
     <div class="card win-card">
       <div class="trophy">🏆</div>
@@ -57,13 +57,13 @@
   </div>
 
   <!-- Settings -->
-  <div class="overlay hidden" id="settings">
+  <div class="overlay hidden" id="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-describedby="settings-help" aria-hidden="true">
     <div class="card">
-      <h2>Settings</h2>
+      <h2 id="settings-title">Settings</h2>
       <label class="row"><span>Sound effects</span><input type="checkbox" id="opt-sound" class="switch" /></label>
       <label class="row"><span>Vibration</span><input type="checkbox" id="opt-vibrate" class="switch" /></label>
       <div class="row"><span>How to play</span></div>
-      <p class="help">Select a tube to pick up its top ball(s), then select another tube to pour. Balls can only be poured onto the same color or into an empty tube. Sort every color into its own tube to win!</p>
+      <p class="help" id="settings-help">Select a tube to pick up its top ball(s), then select another tube to pour. Balls can only be poured onto the same color or into an empty tube. Sort every color into its own tube to win!</p>
       <div class="row buttons">
         <button class="small-btn danger" id="btn-reset">Reset progress</button>
         <a class="small-btn" href="privacy.html" target="_blank" rel="noopener">Privacy</a>

@@ -6,8 +6,9 @@ const URL = process.argv[2] || 'http://localhost:8765/';
 const OUT = process.argv[3] || '/workspace';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+let browser = null;
 (async () => {
-  const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
+  browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
   const page = await browser.newPage();
   await page.emulate({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
     userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Mobile Safari/537.36' });
@@ -19,6 +20,16 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const el = await page.$(`.tube[data-index="${i}"]`);
     const b = await el.boundingBox();
     await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+  }
+  async function touch(selector) {
+    const el = await page.$(selector);
+    const b = await el.boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+  }
+  async function shiftTab() {
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('Tab');
+    await page.keyboard.up('Shift');
   }
   async function waitIdle() { await page.waitForFunction(() => !window.__ballSort.state.busy, { timeout: 5000 }); }
   async function solveCurrent(shotAt) {
@@ -67,11 +78,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(900);
   const won = await page.evaluate(() => window.__ballSort.state.won && !document.getElementById('win').classList.contains('hidden'));
   if (!won) throw new Error('level 1 win not detected');
+  let winFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('win').getAttribute('aria-modal'), hidden: document.getElementById('win').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
+  if (winFocus.active !== 'btn-next' || winFocus.modal !== 'true' || winFocus.hidden !== 'false' || !winFocus.inert) throw new Error('win dialog did not enter modal focus state');
+  await page.keyboard.press('Tab');
+  await shiftTab();
+  await page.evaluate(() => document.getElementById('btn-settings').focus());
+  winFocus = await page.evaluate(() => ({ active: document.activeElement.id, shown: !document.getElementById('win').classList.contains('hidden') }));
+  if (winFocus.active !== 'btn-next' || !winFocus.shown) throw new Error('win dialog did not contain focus');
+  await page.keyboard.press('Escape');
+  if (!(await page.$eval('#win', el => !el.classList.contains('hidden')))) throw new Error('Escape unexpectedly dismissed the win dialog');
   await page.screenshot({ path: `${OUT}/ballsort-win.png` });
   console.log(`level 1 solved by taps in ${moves1} moves, win overlay shown`);
   await page.click('#btn-next'); await sleep(300);
   let lvl = await page.evaluate(() => window.__ballSort.state.level);
   if (lvl !== 2) throw new Error('did not advance');
+  const focusAfterWin = await page.evaluate(() => document.activeElement && document.activeElement.dataset.index);
+  if (focusAfterWin !== '0') throw new Error('focus was not moved to the new board after advancing');
 
   // persistence: reload keeps level 2
   await page.reload({ waitUntil: 'networkidle0' });
@@ -111,13 +133,40 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   // settings screenshot
   await page.goto(URL + '?level=7', { waitUntil: 'networkidle0' }); await sleep(200);
   await page.click('#btn-settings'); await sleep(400);
+  let settingsFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('settings').getAttribute('aria-modal'), hidden: document.getElementById('settings').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
+  if (settingsFocus.active !== 'opt-sound' || settingsFocus.modal !== 'true' || settingsFocus.hidden !== 'false' || !settingsFocus.inert) throw new Error('settings dialog did not enter modal focus state');
+  for (const id of ['opt-vibrate', 'btn-reset']) {
+    await page.keyboard.press('Tab');
+    if ((await page.evaluate(() => document.activeElement.id)) !== id) throw new Error('settings Tab order did not reach ' + id);
+  }
+  await page.keyboard.press('Tab');
+  if (!(await page.evaluate(() => document.activeElement.matches('#settings a[href]')))) throw new Error('settings Tab order skipped the privacy link');
+  await page.keyboard.press('Tab');
+  if ((await page.evaluate(() => document.activeElement.id)) !== 'btn-close-settings') throw new Error('settings Tab order did not reach Done');
+  await page.keyboard.press('Tab');
+  if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('settings Tab did not wrap to the first control');
+  await shiftTab();
+  if ((await page.evaluate(() => document.activeElement.id)) !== 'btn-close-settings') throw new Error('settings Shift+Tab did not wrap to the last control');
+  await page.evaluate(() => document.getElementById('btn-restart').focus());
+  if (!(await page.evaluate(() => document.getElementById('settings').contains(document.activeElement)))) throw new Error('settings dialog did not contain programmatic focus');
+  await page.keyboard.press('Escape');
+  settingsFocus = await page.evaluate(() => ({ active: document.activeElement.id, hidden: document.getElementById('settings').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
+  if (settingsFocus.active !== 'btn-settings' || settingsFocus.hidden !== 'true' || settingsFocus.inert) throw new Error('settings Escape did not close and restore focus');
+  await touch('#btn-settings'); await sleep(100);
   await page.screenshot({ path: `${OUT}/ballsort-settings.png` });
+  await touch('#btn-close-settings'); await sleep(100);
+  if (!(await page.$eval('#settings', el => el.classList.contains('hidden')))) throw new Error('touch Done control did not close settings');
+  if ((await page.evaluate(() => document.activeElement.id)) !== 'btn-settings') throw new Error('touch close did not restore settings focus');
 
   // privacy page
   const resp = await page.goto(URL + 'privacy.html');
   if (resp.status() !== 200) throw new Error('privacy.html ' + resp.status());
 
-  if (errors.length) { console.error('Console errors:', errors); process.exit(1); }
+  if (errors.length) throw new Error('Console errors: ' + errors.join('; '));
   console.log('ALL BROWSER TESTS PASSED');
   await browser.close();
-})().catch(e => { console.error('FAIL', e); process.exit(1); });
+})().catch(async e => {
+  console.error('FAIL', e);
+  if (browser) await browser.close().catch(() => {});
+  process.exitCode = 1;
+});

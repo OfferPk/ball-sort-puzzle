@@ -321,7 +321,7 @@
       Sound.win(); buzz(40);
       $('win-title').textContent = 'Level ' + state.level + ' Complete!';
       $('win-sub').textContent = 'Solved in ' + state.moves + ' move' + (state.moves === 1 ? '' : 's');
-      $('win').classList.remove('hidden');
+      showModal('win');
       confetti();
     }, 350);
     // progress is saved as the next level immediately
@@ -333,10 +333,12 @@
   }
 
   function nextLevel() {
-    $('win').classList.add('hidden');
+    hideModal('win', false);
     stopConfetti();
     Ads.showInterstitial();
     startLevel(state.level + 1);
+    var firstTube = tubeEl(0);
+    if (firstTube) firstTube.focus();
   }
 
   // ---------- toast ----------
@@ -381,9 +383,40 @@
   function openSettings() {
     $('opt-sound').checked = state.settings.sound;
     $('opt-vibrate').checked = state.settings.vibrate;
-    $('settings').classList.remove('hidden');
+    showModal('settings', $('btn-settings'));
   }
   function applySettings() { Sound.setEnabled(state.settings.sound); }
+
+  // ---------- modal focus ----------
+  var activeModal = null;
+  var modalReturnFocus = null;
+  var FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function focusableIn(modal) {
+    return Array.prototype.slice.call(modal.querySelectorAll(FOCUSABLE_SELECTOR)).filter(function (el) {
+      return !el.disabled && !el.closest('.hidden') && el.getAttribute('aria-hidden') !== 'true';
+    });
+  }
+  function showModal(id, returnFocus) {
+    var modal = $(id);
+    activeModal = modal;
+    modalReturnFocus = returnFocus || null;
+    modal.setAttribute('aria-hidden', 'false');
+    modal.classList.remove('hidden');
+    $('app').inert = true;
+    var focusable = focusableIn(modal);
+    if (focusable.length) focusable[0].focus();
+  }
+  function hideModal(id, restoreFocus) {
+    var modal = $(id);
+    if (activeModal !== modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    activeModal = null;
+    var returnFocus = modalReturnFocus;
+    modalReturnFocus = null;
+    $('app').inert = false;
+    if (restoreFocus && returnFocus && document.documentElement.contains(returnFocus) && !returnFocus.disabled) returnFocus.focus();
+  }
 
   // ---------- wire up ----------
   $('btn-undo').addEventListener('click', undo);
@@ -391,17 +424,46 @@
   $('btn-restart').addEventListener('click', restart);
   $('btn-next').addEventListener('click', nextLevel);
   $('btn-settings').addEventListener('click', function () { Sound.click(); openSettings(); });
-  $('btn-close-settings').addEventListener('click', function () { $('settings').classList.add('hidden'); });
+  $('btn-close-settings').addEventListener('click', function () { hideModal('settings', true); });
   $('opt-sound').addEventListener('change', function (e) { state.settings.sound = e.target.checked; applySettings(); save(); });
   $('opt-vibrate').addEventListener('change', function (e) { state.settings.vibrate = e.target.checked; save(); });
   $('btn-reset').addEventListener('click', function () {
     if (!confirm('Reset all progress and go back to level 1?')) return;
-    $('settings').classList.add('hidden');
+    hideModal('settings', true);
     startLevel(1);
   });
   window.addEventListener('resize', function () { clearSelection(); render(); });
   document.addEventListener('keydown', function (e) {
+    if (activeModal) {
+      if (e.key === 'Escape' && activeModal.id === 'settings') {
+        e.preventDefault();
+        hideModal('settings', true);
+      } else if (e.key === 'Tab') {
+        var focusable = focusableIn(activeModal);
+        if (!focusable.length) {
+          e.preventDefault();
+          return;
+        }
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        if (!activeModal.contains(document.activeElement)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') undo();
+  });
+  document.addEventListener('focusin', function (e) {
+    if (!activeModal || activeModal.contains(e.target)) return;
+    var focusable = focusableIn(activeModal);
+    if (focusable.length) focusable[0].focus();
   });
 
   // Test / debug hook (used by the headless test)
