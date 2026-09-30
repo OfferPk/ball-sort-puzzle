@@ -33,6 +33,7 @@
     extraUsed: false,
     moves: 0,
     bestMoves: {},
+    unlockedLevel: 1,
     selected: -1,
     busy: false,
     won: false,
@@ -44,7 +45,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         level: state.won ? state.level + 1 : state.level, settings: state.settings,
-        bestMoves: state.bestMoves,
+        bestMoves: state.bestMoves, unlockedLevel: state.unlockedLevel,
         current: state.won ? null : { level: state.level, tubes: state.tubes, history: state.history, undos: state.undos, extraUsed: state.extraUsed, moves: state.moves }
       }));
     } catch (e) {}
@@ -61,6 +62,14 @@
           typeof moves === 'number' && isFinite(moves) && moves >= 0 && Math.floor(moves) === moves) clean[level] = moves;
     });
     return clean;
+  }
+  function cleanUnlockedLevel(saved) {
+    var highest = 1;
+    [saved && saved.level, saved && saved.unlockedLevel].forEach(function (level) {
+      if (typeof level === 'number' && isFinite(level) && level > 0 && Math.floor(level) === level) highest = Math.max(highest, level);
+    });
+    Object.keys(state.bestMoves).forEach(function (level) { highest = Math.max(highest, Number(level) + 1); });
+    return highest;
   }
 
   // ---------- level setup ----------
@@ -182,6 +191,7 @@
 
   function updateHud() {
     $('moves').textContent = 'Moves: ' + state.moves;
+    $('btn-levels').setAttribute('aria-label', 'Choose a level; current level ' + state.level);
     var sorted = state.tubes.reduce(function (count, tube) {
       return count + (L.isComplete(tube, CAP) ? 1 : 0);
     }, 0);
@@ -405,9 +415,50 @@
     return 'Next: ' + nextColors + ' colors · ' + L.colorsForLevel(unlockLevel) + ' colors at Level ' + unlockLevel;
   }
 
+  function openLevelPicker() {
+    if (state.busy || state.won || activeModal) return;
+    clearSelection();
+    var list = $('level-list');
+    list.textContent = '';
+    for (var level = 1; level <= state.unlockedLevel; level++) {
+      (function (number) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'level-option';
+        button.dataset.level = number;
+        button.textContent = number;
+        var best = state.bestMoves[number];
+        var label = 'Level ' + number;
+        if (number === state.level) {
+          button.classList.add('current');
+          button.setAttribute('aria-current', 'step');
+          label += ', current level';
+        }
+        if (typeof best === 'number') label += ', personal best ' + best + ' moves';
+        button.setAttribute('aria-label', label);
+        button.addEventListener('click', function () { chooseLevel(number); });
+        list.appendChild(button);
+      })(level);
+    }
+    $('levels-help').textContent = 'Levels 1–' + state.unlockedLevel + ' are unlocked. Choosing another level replaces your current board.';
+    $('btn-close-levels').textContent = 'Continue Level ' + state.level;
+    showModal('levels', $('btn-levels'));
+  }
+
+  function chooseLevel(level) {
+    if (level === state.level) { hideModal('levels', true); return; }
+    if ((state.moves > 0 || state.history.length > 0 || state.undos < FREE_UNDOS || state.extraUsed) &&
+        !window.confirm('Leave Level ' + state.level + '? Your current board will be replaced.')) return;
+    hideModal('levels', false);
+    startLevel(level);
+    var firstTube = tubeEl(0);
+    if (firstTube) firstTube.focus();
+  }
+
   function onWin() {
     state.won = true;
     updateHud();
+    state.unlockedLevel = Math.max(state.unlockedLevel, state.level + 1);
     var previousBest = state.bestMoves[state.level];
     var improved = typeof previousBest !== 'number' || state.moves < previousBest;
     if (improved) state.bestMoves[state.level] = state.moves;
@@ -522,6 +573,8 @@
   $('btn-undo').addEventListener('click', undo);
   $('btn-hint').addEventListener('click', showHint);
   $('btn-tube').addEventListener('click', addTube);
+  $('btn-levels').addEventListener('click', openLevelPicker);
+  $('btn-close-levels').addEventListener('click', function () { hideModal('levels', true); });
   $('btn-restart').addEventListener('click', restart);
   $('btn-next').addEventListener('click', nextLevel);
   $('btn-replay').addEventListener('click', replayLevel);
@@ -533,14 +586,15 @@
     if (!confirm('Reset all progress and go back to level 1?')) return;
     hideModal('settings', true);
     state.bestMoves = {};
+    state.unlockedLevel = 1;
     startLevel(1);
   });
   window.addEventListener('resize', function () { clearSelection(); render(); });
   document.addEventListener('keydown', function (e) {
     if (activeModal) {
-      if (e.key === 'Escape' && activeModal.id === 'settings') {
+      if (e.key === 'Escape' && (activeModal.id === 'settings' || activeModal.id === 'levels')) {
         e.preventDefault();
-        hideModal('settings', true);
+        hideModal(activeModal.id, true);
       } else if (e.key === 'Tab') {
         var focusable = focusableIn(activeModal);
         if (!focusable.length) {
@@ -575,6 +629,7 @@
   var saved = load();
   if (saved && saved.settings) state.settings = Object.assign(state.settings, saved.settings);
   state.bestMoves = cleanBestMoves(saved && saved.bestMoves);
+  state.unlockedLevel = cleanUnlockedLevel(saved);
   applySettings();
   var params = new URLSearchParams(location.search);
   var startAt = parseInt(params.get('level'), 10) || (saved && saved.level) || 1;

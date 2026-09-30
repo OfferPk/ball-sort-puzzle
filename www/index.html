@@ -16,10 +16,10 @@
       <button class="icon-btn" id="btn-restart" aria-label="Restart level" title="Restart">
         <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
       </button>
-      <div class="level-box">
-        <div class="level-label">LEVEL</div>
-        <div class="level-num" id="level-num">1</div>
-      </div>
+      <button class="level-box" id="btn-levels" type="button" aria-label="Choose a level; current level 1" title="Choose an unlocked level">
+        <span class="level-label">LEVEL</span>
+        <span class="level-num-row"><span class="level-num" id="level-num">1</span><span class="level-caret" aria-hidden="true">▾</span></span>
+      </button>
       <button class="icon-btn" id="btn-settings" aria-label="Settings" title="Settings">
         <svg viewBox="0 0 24 24"><path d="M19.4 13a7.8 7.8 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.8 7.8 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.9a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
       </button>
@@ -61,6 +61,16 @@
     </div>
   </div>
 
+  <!-- Unlocked level picker -->
+  <div class="overlay hidden" id="levels" role="dialog" aria-modal="true" aria-labelledby="levels-title" aria-describedby="levels-help" aria-hidden="true">
+    <div class="card level-card">
+      <h2 id="levels-title">Choose a level</h2>
+      <p class="help" id="levels-help">Choose an unlocked level to play again.</p>
+      <div class="level-grid" id="level-list" role="group" aria-label="Unlocked levels"></div>
+      <button class="big-btn" id="btn-close-levels" type="button">Continue Level 1</button>
+    </div>
+  </div>
+
   <!-- Settings -->
   <div class="overlay hidden" id="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-describedby="settings-help" aria-hidden="true">
     <div class="card">
@@ -68,7 +78,7 @@
       <label class="row"><span>Sound effects</span><input type="checkbox" id="opt-sound" class="switch" /></label>
       <label class="row"><span>Vibration</span><input type="checkbox" id="opt-vibrate" class="switch" /></label>
       <div class="row"><span>How to play</span></div>
-      <p class="help" id="settings-help">Touch: Tap a tube to select it, then tap another tube to pour. Keyboard: Focus a tube, use the arrow keys to move between tubes (Left/Right within a row; Up/Down to the nearest tube in the adjacent row), then press Enter or Space to select a tube and select another to pour. Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state. Balls can only be poured onto the same color or into an empty tube. Sort every color into its own tube to win! Hint: Shows one recommended legal move without changing the board.</p>
+      <p class="help" id="settings-help">Touch: Tap a tube to select it, then tap another tube to pour. Keyboard: Focus a tube, use the arrow keys to move between tubes (Left/Right within a row; Up/Down to the nearest tube in the adjacent row), then press Enter or Space to select a tube and select another to pour. Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state. Balls can only be poured onto the same color or into an empty tube. Sort every color into its own tube to win! Hint: Shows one recommended legal move without changing the board. Levels: Tap the level number to revisit any unlocked level.</p>
       <div class="row buttons">
         <button class="small-btn danger" id="btn-reset">Reset progress</button>
         <a class="small-btn" href="privacy.html" target="_blank" rel="noopener">Privacy</a>
@@ -82,6 +92,6 @@
   <script src="js/ads-config.js"></script>
   <script src="js/ads.js"></script>
   <script src="js/sound.js"></script>
-  <script src="js/game.js?v=b508af7"></script>
+  <script src="js/game.js?v=level-picker"></script>
 </body>
 </html>

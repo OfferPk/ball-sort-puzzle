@@ -288,7 +288,7 @@ async function openTestPage() {
     progress: document.getElementById('sort-progress').textContent,
     saved: JSON.parse(localStorage.getItem('ballsort.v1'))
   }));
-  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.nextChallenge !== 'Next: 3 colors · 4 colors at Level 4' || !firstBest.winDescribedby.split(' ').includes('next-challenge') || firstBest.progress !== 'Sorted: 3 / 3' || firstBest.saved.level !== 2 || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
+  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.nextChallenge !== 'Next: 3 colors · 4 colors at Level 4' || !firstBest.winDescribedby.split(' ').includes('next-challenge') || firstBest.progress !== 'Sorted: 3 / 3' || firstBest.saved.level !== 2 || firstBest.saved.unlockedLevel < firstBest.saved.level || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
     throw new Error('first level win did not record a personal best and save the next level immediately');
   }
   let winFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('win').getAttribute('aria-modal'), hidden: document.getElementById('win').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
@@ -330,6 +330,79 @@ async function openTestPage() {
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 0 / 3') throw new Error('advancing to the next level did not reset sorted-color progress');
   const focusAfterWin = await page.evaluate(() => document.activeElement && document.activeElement.dataset.index);
   if (focusAfterWin !== '0') throw new Error('focus was not moved to the new board after advancing');
+
+  // Players can revisit unlocked levels. The highest unlock survives switching
+  // backward/reloading, while abandoning an in-progress board requires consent.
+  await page.evaluate(moves => {
+    // Earlier synthetic preview fixtures completed levels 3/4; reset their
+    // test-only records so this picker case starts from the real Level 1 edge.
+    window.__ballSort.state.bestMoves = { '1': moves };
+    window.__ballSort.state.unlockedLevel = 2;
+    window.__ballSort.startLevel(2, {
+      level: 2, tubes: [[0, 0], [0, 0], [1, 1, 1, 1], [2, 2, 2, 2], []],
+      history: [], undos: 3, extraUsed: false, moves: 0
+    });
+  }, moves1);
+  const pickerTrigger = await page.$eval('#btn-levels', button => ({ tag: button.tagName, type: button.type, name: button.getAttribute('aria-label') }));
+  if (pickerTrigger.tag !== 'BUTTON' || pickerTrigger.type !== 'button' || pickerTrigger.name !== 'Choose a level; current level 2') throw new Error('level picker trigger is missing its current-level accessible name');
+  await page.click('#btn-levels');
+  let picker = await page.evaluate(() => ({
+    hidden: document.getElementById('levels').getAttribute('aria-hidden'),
+    inert: document.getElementById('app').inert,
+    levels: [...document.querySelectorAll('#level-list button')].map(button => Number(button.dataset.level)),
+    current: document.querySelector('#level-list [aria-current="step"]')?.dataset.level,
+    currentName: document.querySelector('#level-list [aria-current="step"]')?.getAttribute('aria-label')
+  }));
+  if (picker.hidden !== 'false' || !picker.inert || JSON.stringify(picker.levels) !== JSON.stringify([1, 2]) || picker.current !== '2' || !/current level/.test(picker.currentName || '') || await page.$('#level-list [data-level="3"]')) {
+    throw new Error('level picker did not expose only unlocked levels and mark the current level: ' + JSON.stringify(picker));
+  }
+  await sleep(350);
+  await page.screenshot({ path: `${OUT}/ballsort-level-picker.png` });
+  await page.keyboard.press('Escape');
+  const dismissedPicker = await page.evaluate(() => ({ hidden: document.getElementById('levels').getAttribute('aria-hidden'), inert: document.getElementById('app').inert, focus: document.activeElement.id }));
+  if (dismissedPicker.hidden !== 'true' || dismissedPicker.inert || dismissedPicker.focus !== 'btn-levels') throw new Error('Escape did not close the level picker and restore focus');
+  await page.click('#btn-levels');
+  await page.click('#level-list [data-level="1"]');
+  if ((await page.evaluate(() => window.__ballSort.state.level)) !== 1) throw new Error('choosing an unlocked level did not start it');
+  await page.reload({ waitUntil: 'networkidle0' });
+  const persistedUnlock = await page.evaluate(() => ({
+    level: window.__ballSort.state.level,
+    unlocked: window.__ballSort.state.unlockedLevel,
+    best: window.__ballSort.state.bestMoves['1'],
+    savedUnlock: JSON.parse(localStorage.getItem('ballsort.v1')).unlockedLevel
+  }));
+  if (persistedUnlock.level !== 1 || persistedUnlock.unlocked !== 2 || persistedUnlock.savedUnlock !== 2 || persistedUnlock.best !== moves1) {
+    throw new Error('choosing an earlier level did not persist the higher unlock and personal best');
+  }
+  await page.click('#btn-levels');
+  picker = await page.evaluate(() => [...document.querySelectorAll('#level-list button')].map(button => Number(button.dataset.level)));
+  if (JSON.stringify(picker) !== JSON.stringify([1, 2])) throw new Error('reloaded level picker forgot the previously unlocked level');
+  await page.click('#level-list [data-level="2"]');
+
+  await page.evaluate(() => window.__ballSort.startLevel(2));
+  const unfinishedMove = await page.evaluate(() => window.__ballSort.logic.solve(window.__ballSort.state.tubes)[0]);
+  if (!unfinishedMove) throw new Error('generated Level 2 puzzle had no legal move for the leave-warning test');
+  await tap(unfinishedMove[0]); await tap(unfinishedMove[1]); await waitIdle();
+  if (await page.evaluate(() => window.__ballSort.state.won)) throw new Error('first legal Level 2 move unexpectedly completed the puzzle');
+  const activeBoard = await page.evaluate(() => ({ tubes: JSON.stringify(window.__ballSort.state.tubes), moves: window.__ballSort.state.moves, saved: localStorage.getItem('ballsort.v1') }));
+  await page.click('#btn-levels');
+  let confirmMessage = '';
+  page.once('dialog', async dialog => { confirmMessage = dialog.message(); await dialog.dismiss(); });
+  await page.click('#level-list [data-level="1"]');
+  const afterCancel = await page.evaluate(() => ({ level: window.__ballSort.state.level, tubes: JSON.stringify(window.__ballSort.state.tubes), moves: window.__ballSort.state.moves, saved: localStorage.getItem('ballsort.v1') }));
+  if (!/Leave Level 2\?/.test(confirmMessage) || afterCancel.level !== 2 || afterCancel.tubes !== activeBoard.tubes || afterCancel.moves !== activeBoard.moves || afterCancel.saved !== activeBoard.saved) {
+    throw new Error('canceling a level change did not preserve the current board and save');
+  }
+  page.once('dialog', dialog => dialog.accept());
+  await page.click('#level-list [data-level="1"]');
+  if ((await page.evaluate(() => window.__ballSort.state.level)) !== 1) throw new Error('confirming a level change did not switch levels');
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.click('#btn-levels');
+  picker = await page.evaluate(() => [...document.querySelectorAll('#level-list button')].map(button => Number(button.dataset.level)));
+  if (JSON.stringify(picker) !== JSON.stringify([1, 2])) throw new Error('confirmed level change did not preserve the unlocked-level list across reload');
+  await page.click('#level-list [data-level="2"]');
+  if ((await page.evaluate(() => window.__ballSort.state.level)) !== 2) throw new Error('could not return to the highest unlocked level');
+  console.log('level picker switches between unlocked levels, persists unlocks, and protects unfinished boards');
 
   // persistence: reload keeps level 2
   await page.reload({ waitUntil: 'networkidle0' });
@@ -530,7 +603,7 @@ async function openTestPage() {
   let settingsFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('settings').getAttribute('aria-modal'), hidden: document.getElementById('settings').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
   if (settingsFocus.active !== 'opt-sound' || settingsFocus.modal !== 'true' || settingsFocus.hidden !== 'false' || !settingsFocus.inert) throw new Error('settings dialog did not enter modal focus state');
   const howToPlay = await page.$eval('#settings-help', el => el.textContent);
-  if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state\./.test(howToPlay) || !/Hint: Shows one recommended legal move without changing the board\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, accessibility, or hint guidance');
+  if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state\./.test(howToPlay) || !/Hint: Shows one recommended legal move without changing the board\./.test(howToPlay) || !/Levels: Tap the level number to revisit any unlocked level\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, accessibility, hint, or level-picker guidance');
   await page.keyboard.press('ArrowRight');
   if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('tube arrow navigation interfered with settings dialog focus');
   for (const id of ['opt-vibrate', 'btn-reset']) {
@@ -560,9 +633,9 @@ async function openTestPage() {
   await page.click('#btn-settings'); await page.click('#btn-reset'); await sleep(100);
   const resetProgress = await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('ballsort.v1'));
-    return { level: window.__ballSort.state.level, bestMoves: window.__ballSort.state.bestMoves, savedLevel: saved.level, savedBestMoves: saved.bestMoves };
+    return { level: window.__ballSort.state.level, unlocked: window.__ballSort.state.unlockedLevel, bestMoves: window.__ballSort.state.bestMoves, savedLevel: saved.level, savedUnlock: saved.unlockedLevel, savedBestMoves: saved.bestMoves };
   });
-  if (resetProgress.level !== 1 || resetProgress.savedLevel !== 1 || Object.keys(resetProgress.bestMoves).length || Object.keys(resetProgress.savedBestMoves).length) {
+  if (resetProgress.level !== 1 || resetProgress.unlocked !== 1 || resetProgress.savedLevel !== 1 || resetProgress.savedUnlock !== 1 || Object.keys(resetProgress.bestMoves).length || Object.keys(resetProgress.savedBestMoves).length) {
     throw new Error('reset progress did not clear personal-best records along with level progress');
   }
   console.log('explicit progress reset clears personal-best records');
