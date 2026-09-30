@@ -32,6 +32,50 @@ let browser = null;
     await page.keyboard.up('Shift');
   }
   async function waitIdle() { await page.waitForFunction(() => !window.__ballSort.state.busy, { timeout: 5000 }); }
+  async function assertTubeAccessibility(context) {
+    const expected = await page.evaluate(() => {
+      const colorNames = ['red', 'blue', 'yellow', 'green', 'purple', 'orange', 'cyan', 'pink', 'brown', 'white', 'navy', 'lime'];
+      const capacity = window.__ballSort.logic.CAPACITY;
+      return {
+        selected: window.__ballSort.state.selected,
+        tubes: window.__ballSort.state.tubes.map((tube, index) => {
+          let name = `Tube ${index + 1}, `;
+          if (!tube.length) name += 'empty';
+          else {
+            name += `${tube.length} of ${capacity} balls; bottom to top: ${tube.map(color => colorNames[color % colorNames.length]).join(', ')}`;
+            if (window.__ballSort.logic.isComplete(tube, capacity)) name += '; complete';
+          }
+          return { index, name, pressed: index === window.__ballSort.state.selected };
+        })
+      };
+    });
+    const tree = await page.accessibility.snapshot({ interestingOnly: false });
+    const buttons = [];
+    let boardPresent = false;
+    const visit = node => {
+      if (node.role === 'group' && node.name === 'Game board') boardPresent = true;
+      if (node.role === 'button' && /^Tube \d+, /.test(node.name || '')) buttons.push(node);
+      for (const child of node.children || []) visit(child);
+    };
+    visit(tree);
+    if (!boardPresent) throw new Error(`${context}: game board is missing from the accessibility tree`);
+    if (buttons.length !== expected.tubes.length) throw new Error(`${context}: accessibility tree exposed ${buttons.length} tube buttons for ${expected.tubes.length} tubes`);
+    const dom = await page.$$eval('.tube', elements => elements.map(element => ({
+      index: Number(element.dataset.index), tag: element.tagName, type: element.type,
+      name: element.getAttribute('aria-label'), pressed: element.getAttribute('aria-pressed'),
+      decorativeBallsHidden: [...element.querySelectorAll('.ball')].every(ball => ball.getAttribute('aria-hidden') === 'true')
+    })));
+    for (const tube of expected.tubes) {
+      const accessibleButton = buttons.find(button => button.name === tube.name);
+      if (!accessibleButton || accessibleButton.pressed !== tube.pressed) {
+        throw new Error(`${context}: tube ${tube.index + 1} AX name/pressed state mismatch; expected ${JSON.stringify({ name: tube.name, pressed: tube.pressed })}, got ${JSON.stringify(accessibleButton && { name: accessibleButton.name, pressed: accessibleButton.pressed })}`);
+      }
+      const element = dom.find(candidate => candidate.index === tube.index);
+      if (!element || element.tag !== 'BUTTON' || element.type !== 'button' || element.name !== tube.name || element.pressed !== String(tube.pressed) || !element.decorativeBallsHidden) {
+        throw new Error(`${context}: tube ${tube.index + 1} DOM semantics/name/state mismatch`);
+      }
+    }
+  }
   async function solveCurrent(shotAt) {
     const sol = await page.evaluate(() => window.__ballSort.logic.solve(window.__ballSort.state.tubes, { nodeLimit: 500000 }));
     if (!sol) throw new Error('no solution');
@@ -55,6 +99,9 @@ let browser = null;
     tubes: [...document.querySelectorAll('.tube')].every(t => t.tagName === 'BUTTON' && t.type === 'button' && t.getAttribute('aria-label').startsWith('Tube ') && t.hasAttribute('aria-pressed') && t.getAttribute('aria-keyshortcuts') === 'ArrowLeft ArrowRight ArrowUp ArrowDown')
   }));
   if (accessible.board !== 'group' || accessible.liveMoves !== 'polite' || !accessible.tubes) throw new Error('accessible board/tube semantics missing');
+  await page.evaluate(() => window.__ballSort.startLevel(1, { level: 1, tubes: [[0, 1, 2, 0], [], [2, 2, 2, 2], [1, 2], []], history: [], undos: 3, extraUsed: false, moves: 0 }));
+  await assertTubeAccessibility('label fixture');
+  await page.evaluate(() => window.__ballSort.startLevel(1));
 
   const navRows = await page.evaluate(() => [...document.querySelectorAll('#board .tube-row')].map(row => [...row.querySelectorAll('.tube')].map(t => t.dataset.index)));
   if (navRows.length < 2 || navRows[0].length < 2) throw new Error('level 1 did not render a navigable tube grid');
@@ -109,15 +156,19 @@ let browser = null;
   await page.keyboard.press('Enter');
   let selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
   if (selected !== 'true') throw new Error('keyboard selection did not update pressed state');
+  await assertTubeAccessibility('Enter selection');
   await page.keyboard.press('Enter');
   selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
   if (selected !== 'false') throw new Error('keyboard deselection did not update pressed state');
+  await assertTubeAccessibility('Enter deselection');
   await page.keyboard.press('Space');
   selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
   if (selected !== 'true') throw new Error('Space did not activate tube selection');
+  await assertTubeAccessibility('Space selection');
   await page.keyboard.press('Space');
   selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
   if (selected !== 'false') throw new Error('Space did not activate tube deselection');
+  await assertTubeAccessibility('Space deselection');
 
   const keyboardMove = await page.evaluate(() => window.__ballSort.logic.solve(window.__ballSort.state.tubes)[0]);
   await page.focus(`.tube[data-index="${keyboardMove[0]}"]`);
@@ -127,10 +178,12 @@ let browser = null;
   await waitIdle();
   const focusedTube = await page.evaluate(() => document.activeElement && document.activeElement.dataset.index);
   if (focusedTube !== String(keyboardMove[1])) throw new Error('keyboard focus was not restored after move');
+  await assertTubeAccessibility('keyboard move');
   await page.evaluate(() => window.__ballSort.startLevel(1));
 
   // play level 1 by taps
   const moves1 = await solveCurrent();
+  await assertTubeAccessibility('completed level');
   await sleep(900);
   const won = await page.evaluate(() => window.__ballSort.state.won && !document.getElementById('win').classList.contains('hidden'));
   if (!won) throw new Error('level 1 win not detected');
@@ -192,7 +245,7 @@ let browser = null;
   let settingsFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('settings').getAttribute('aria-modal'), hidden: document.getElementById('settings').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
   if (settingsFocus.active !== 'opt-sound' || settingsFocus.modal !== 'true' || settingsFocus.hidden !== 'false' || !settingsFocus.inert) throw new Error('settings dialog did not enter modal focus state');
   const howToPlay = await page.$eval('#settings-help', el => el.textContent);
-  if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Screen readers announce each tube's number, ball colors and contents, and whether it is selected\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, or screen-reader guidance');
+  if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, or accessibility guidance');
   await page.keyboard.press('ArrowRight');
   if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('tube arrow navigation interfered with settings dialog focus');
   for (const id of ['opt-vibrate', 'btn-reset']) {
