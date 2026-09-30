@@ -78,6 +78,8 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 .tube.complete::before { background: #9ef01a; }
 .tube.shake { animation: shake .3s; }
 .tube.pop { animation: pop .45s; }
+.tube.hint-source { outline: 3px solid #ffd166; outline-offset: 3px; }
+.tube.hint-target { outline: 3px solid #6fffe9; outline-offset: 3px; }
 .tube.extra { border-style: dashed; }
 @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 @keyframes pop { 0%,100% { transform: scale(1); } 40% { transform: scale(1.08); } }
@@ -93,9 +95,9 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 .ball.ghost { visibility: hidden; }
 .flying { position: fixed; z-index: 50; pointer-events: none; margin: 0; transition: none; }
 
-.toolbar { display: flex; justify-content: center; gap: 18px; padding-top: 6px; }
+.toolbar { width: min(100%, 450px); margin: 0 auto; display: flex; justify-content: center; gap: 10px; padding-top: 6px; }
 .tool-btn {
-  position: relative; min-width: 120px; height: 58px; padding: 0 18px;
+  position: relative; min-width: 0; flex: 1; height: 58px; padding: 0 10px;
   border-radius: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;
   background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.1));
   border: 1px solid var(--glass-border);
@@ -162,3 +164,13 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 }
 .switch:checked { background: #06d6a0; }
 .switch:checked::after { transform: translateX(22px); }
+
+@media (max-width: 420px) {
+  .tool-btn { padding: 0 6px; gap: 5px; font-size: 14px; white-space: nowrap; }
+  .tool-btn svg { width: 22px; height: 22px; }
+}
+
+@media (max-width: 360px) {
+  .tool-btn { padding: 0 5px; gap: 4px; font-size: 14px; }
+  .tool-btn svg { width: 21px; height: 21px; }
+}

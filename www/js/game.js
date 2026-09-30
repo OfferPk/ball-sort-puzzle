@@ -177,6 +177,28 @@
     $('btn-tube').disabled = state.extraUsed || state.won;
   }
 
+  var hintTimer = null;
+  function clearHints() {
+    clearTimeout(hintTimer);
+    hintTimer = null;
+    board.querySelectorAll('.hint-source, .hint-target').forEach(function (el) {
+      el.classList.remove('hint-source', 'hint-target');
+    });
+  }
+  function showHint() {
+    if (state.busy || state.won || activeModal) return;
+    var solution = L.solve(state.tubes);
+    if (!solution || !solution.length) { toast('No hint available for this board'); return; }
+    clearHints();
+    var move = solution[0];
+    var source = tubeEl(move[0]), target = tubeEl(move[1]);
+    if (!source || !target) { toast('No hint available for this board'); return; }
+    source.classList.add('hint-source');
+    target.classList.add('hint-target');
+    hintTimer = setTimeout(clearHints, 1800);
+    toast('Try Tube ' + (move[0] + 1) + ' → Tube ' + (move[1] + 1));
+  }
+
   // ---------- input ----------
   function navigateTube(e) {
     var horizontal = 0, vertical = 0;
@@ -463,6 +485,7 @@
   // ---------- wire up ----------
   board.addEventListener('keydown', navigateTube);
   $('btn-undo').addEventListener('click', undo);
+  $('btn-hint').addEventListener('click', showHint);
   $('btn-tube').addEventListener('click', addTube);
   $('btn-restart').addEventListener('click', restart);
   $('btn-next').addEventListener('click', nextLevel);

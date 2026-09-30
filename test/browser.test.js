@@ -104,6 +104,15 @@ async function openTestPage() {
   await page.goto(URL, { waitUntil: 'networkidle0' });
   await sleep(300);
   await page.screenshot({ path: `${OUT}/ballsort-level1.png` });
+  const toolbarLabels = await page.$$eval('.toolbar .tool-btn', buttons => buttons.map(button => {
+    const label = button.querySelector('.tool-label');
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const rect = button.getBoundingClientRect();
+    const footer = button.parentElement.getBoundingClientRect();
+    return { text: label.textContent.trim(), lines: range.getClientRects().length, contained: rect.left >= footer.left && rect.right <= footer.right };
+  }));
+  if (toolbarLabels.length !== 3 || toolbarLabels.some(label => label.lines !== 1 || !label.contained)) throw new Error('mobile toolbar labels wrapped or escaped their footer');
 
   const accessible = await page.evaluate(() => ({
     board: document.getElementById('board').getAttribute('role'),
@@ -114,6 +123,42 @@ async function openTestPage() {
   await page.evaluate(() => window.__ballSort.startLevel(1, { level: 1, tubes: [[0, 1, 2, 0], [], [2, 2, 2, 2], [1, 2], []], history: [], undos: 3, extraUsed: false, moves: 0 }));
   await assertTubeAccessibility('label fixture');
   await page.evaluate(() => window.__ballSort.startLevel(1));
+
+  const hintBefore = await page.evaluate(() => {
+    const state = window.__ballSort.state;
+    return {
+      move: window.__ballSort.logic.solve(state.tubes)[0],
+      tubes: JSON.stringify(state.tubes), history: JSON.stringify(state.history),
+      moves: state.moves, selected: state.selected, undos: state.undos,
+      extraUsed: state.extraUsed, saved: localStorage.getItem('ballsort.v1')
+    };
+  });
+  if (!hintBefore.move) throw new Error('hint fixture has no legal solution move');
+  const expectedHint = `Try Tube ${hintBefore.move[0] + 1} → Tube ${hintBefore.move[1] + 1}`;
+  const hintButton = await page.$eval('#btn-hint', el => ({ tag: el.tagName, type: el.type, label: el.getAttribute('aria-label'), text: el.textContent.trim() }));
+  if (hintButton.tag !== 'BUTTON' || hintButton.type !== 'button' || hintButton.label !== 'Show a hint' || hintButton.text !== 'Hint') throw new Error('hint control is not a named semantic button');
+  await page.focus('#btn-hint');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(message => document.getElementById('toast').textContent === message, {}, expectedHint);
+  const hinted = await page.evaluate(move => {
+    const state = window.__ballSort.state;
+    return {
+      message: document.getElementById('toast').textContent,
+      toastRole: document.getElementById('toast').getAttribute('role'),
+      sourceMarked: document.querySelector(`.tube[data-index="${move[0]}"]`).classList.contains('hint-source'),
+      targetMarked: document.querySelector(`.tube[data-index="${move[1]}"]`).classList.contains('hint-target'),
+      tubes: JSON.stringify(state.tubes), history: JSON.stringify(state.history),
+      moves: state.moves, selected: state.selected, undos: state.undos,
+      extraUsed: state.extraUsed, saved: localStorage.getItem('ballsort.v1')
+    };
+  }, hintBefore.move);
+  if (hinted.message !== expectedHint || hinted.toastRole !== 'status' || !hinted.sourceMarked || !hinted.targetMarked) throw new Error('hint did not announce and highlight the recommended legal move');
+  for (const key of ['tubes', 'history', 'moves', 'selected', 'undos', 'extraUsed', 'saved']) {
+    if (hinted[key] !== hintBefore[key]) throw new Error(`hint changed ${key}`);
+  }
+  await touch('#btn-hint');
+  await page.waitForFunction(message => document.getElementById('toast').textContent === message, {}, expectedHint);
+  console.log('keyboard and touch hints announce a legal move without changing gameplay or saved state');
 
   const navRows = await page.evaluate(() => [...document.querySelectorAll('#board .tube-row')].map(row => [...row.querySelectorAll('.tube')].map(t => t.dataset.index)));
   if (navRows.length < 2 || navRows[0].length < 2) throw new Error('level 1 did not render a navigable tube grid');
@@ -384,7 +429,7 @@ async function openTestPage() {
   let settingsFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('settings').getAttribute('aria-modal'), hidden: document.getElementById('settings').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
   if (settingsFocus.active !== 'opt-sound' || settingsFocus.modal !== 'true' || settingsFocus.hidden !== 'false' || !settingsFocus.inert) throw new Error('settings dialog did not enter modal focus state');
   const howToPlay = await page.$eval('#settings-help', el => el.textContent);
-  if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, or accessibility guidance');
+  if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state\./.test(howToPlay) || !/Hint: Shows one recommended legal move without changing the board\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, accessibility, or hint guidance');
   await page.keyboard.press('ArrowRight');
   if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('tube arrow navigation interfered with settings dialog focus');
   for (const id of ['opt-vibrate', 'btn-reset']) {
