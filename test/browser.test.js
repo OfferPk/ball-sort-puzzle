@@ -433,6 +433,43 @@ async function openTestPage() {
   }
   console.log('a blocked pour into a full tube is announced without changing the selected source, board, or save');
   await page.evaluate(() => window.__ballSort.startLevel(1));
+  async function assertBlockedSource(index, expectedMessage, context) {
+    const before = await page.evaluate(() => {
+      const state = window.__ballSort.state;
+      return {
+        selected: state.selected, tubes: JSON.stringify(state.tubes), history: JSON.stringify(state.history),
+        moves: state.moves, undos: state.undos, extraUsed: state.extraUsed, saved: localStorage.getItem('ballsort.v1')
+      };
+    });
+    await tap(index);
+    await page.waitForFunction(message => document.getElementById('toast').textContent === message, {}, expectedMessage);
+    const after = await page.evaluate(index => {
+      const state = window.__ballSort.state;
+      return {
+        selected: state.selected, tubes: JSON.stringify(state.tubes), history: JSON.stringify(state.history),
+        moves: state.moves, undos: state.undos, extraUsed: state.extraUsed, saved: localStorage.getItem('ballsort.v1'),
+        message: document.getElementById('toast').textContent, role: document.getElementById('toast').getAttribute('role'),
+        shake: document.querySelector(`.tube[data-index="${index}"]`).classList.contains('shake')
+      };
+    }, index);
+    if (after.message !== expectedMessage || after.role !== 'status' || after.selected !== -1 || !after.shake) {
+      throw new Error(`${context}: invalid source tap was not announced as status feedback: ${JSON.stringify(after)}`);
+    }
+    for (const key of ['selected', 'tubes', 'history', 'moves', 'undos', 'extraUsed', 'saved']) {
+      if (after[key] !== before[key]) throw new Error(`${context}: invalid source tap changed ${key}`);
+    }
+    await assertTubeAccessibility(`${context} rejected source`);
+  }
+  const emptySource = await page.evaluate(() => window.__ballSort.state.tubes.findIndex(tube => !tube.length));
+  if (emptySource < 0) throw new Error('Level 1 did not provide an empty tube for source-feedback coverage');
+  await assertBlockedSource(emptySource, `Tube ${emptySource + 1} is empty. Choose a tube with balls.`, 'empty tube');
+  await page.evaluate(() => window.__ballSort.startLevel(1, {
+    level: 1, tubes: [[0, 0, 0, 0], [1, 1, 1], [2, 2, 2, 2], [], []],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  await assertBlockedSource(0, 'Tube 1 is already sorted. Choose a mixed tube.', 'completed tube');
+  console.log('empty and already-sorted source taps announce why selection failed without changing gameplay or saved progress');
+  await page.evaluate(() => window.__ballSort.startLevel(1));
 
   // play level 1 by taps
   const moves1 = await solveCurrent();

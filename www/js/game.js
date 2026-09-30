@@ -306,7 +306,16 @@
     if (state.busy || state.won) return;
     var sel = state.selected;
     if (sel === -1) {
-      if (!state.tubes[i].length || L.isComplete(state.tubes[i], CAP)) { shake(i); return; }
+      if (!state.tubes[i].length) {
+        shake(i);
+        toast('Tube ' + (i + 1) + ' is empty. Choose a tube with balls.');
+        return;
+      }
+      if (L.isComplete(state.tubes[i], CAP)) {
+        shake(i);
+        toast('Tube ' + (i + 1) + ' is already sorted. Choose a mixed tube.');
+        return;
+      }
       state.selected = i;
       setLift(i, true);
       updateDestinationHints(true);
