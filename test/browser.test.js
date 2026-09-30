@@ -185,6 +185,8 @@ let browser = null;
   await page.click('#btn-settings'); await sleep(400);
   let settingsFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('settings').getAttribute('aria-modal'), hidden: document.getElementById('settings').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
   if (settingsFocus.active !== 'opt-sound' || settingsFocus.modal !== 'true' || settingsFocus.hidden !== 'false' || !settingsFocus.inert) throw new Error('settings dialog did not enter modal focus state');
+  const howToPlay = await page.$eval('#settings-help', el => el.textContent);
+  if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Screen readers announce each tube's number, ball colors and contents, and whether it is selected\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, or screen-reader guidance');
   await page.keyboard.press('ArrowRight');
   if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('tube arrow navigation interfered with settings dialog focus');
   for (const id of ['opt-vibrate', 'btn-reset']) {
