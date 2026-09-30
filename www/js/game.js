@@ -32,6 +32,7 @@
     undos: FREE_UNDOS,
     extraUsed: false,
     moves: 0,
+    bestMoves: {},
     selected: -1,
     busy: false,
     won: false,
@@ -42,13 +43,24 @@
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        level: state.level, settings: state.settings,
-        current: { level: state.level, tubes: state.tubes, history: state.history, undos: state.undos, extraUsed: state.extraUsed, moves: state.moves }
+        level: state.won ? state.level + 1 : state.level, settings: state.settings,
+        bestMoves: state.bestMoves,
+        current: state.won ? null : { level: state.level, tubes: state.tubes, history: state.history, undos: state.undos, extraUsed: state.extraUsed, moves: state.moves }
       }));
     } catch (e) {}
   }
   function load() {
     try { return JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) { return null; }
+  }
+  function cleanBestMoves(value) {
+    var clean = {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return clean;
+    Object.keys(value).forEach(function (level) {
+      var number = Number(level), moves = value[level];
+      if (number > 0 && Math.floor(number) === number && String(number) === level &&
+          typeof moves === 'number' && isFinite(moves) && moves >= 0 && Math.floor(moves) === moves) clean[level] = moves;
+    });
+    return clean;
   }
 
   // ---------- level setup ----------
@@ -381,19 +393,18 @@
   function onWin() {
     state.won = true;
     updateHud();
+    var previousBest = state.bestMoves[state.level];
+    var improved = typeof previousBest !== 'number' || state.moves < previousBest;
+    if (improved) state.bestMoves[state.level] = state.moves;
+    $('win-sub').textContent = 'Solved in ' + state.moves + ' move' + (state.moves === 1 ? '' : 's') +
+      (improved ? ' · New personal best!' : ' · Personal best: ' + previousBest + ' moves');
+    save();
     setTimeout(function () {
       Sound.win(); buzz(40);
       $('win-title').textContent = 'Level ' + state.level + ' Complete!';
-      $('win-sub').textContent = 'Solved in ' + state.moves + ' move' + (state.moves === 1 ? '' : 's');
       showModal('win');
       confetti();
     }, 350);
-    // progress is saved as the next level immediately
-    try {
-      var s = load() || {};
-      s.level = state.level + 1; s.current = null; s.settings = state.settings;
-      localStorage.setItem(STORE, JSON.stringify(s));
-    } catch (e) {}
   }
 
   function nextLevel() {
@@ -496,6 +507,7 @@
   $('btn-reset').addEventListener('click', function () {
     if (!confirm('Reset all progress and go back to level 1?')) return;
     hideModal('settings', true);
+    state.bestMoves = {};
     startLevel(1);
   });
   window.addEventListener('resize', function () { clearSelection(); render(); });
@@ -537,6 +549,7 @@
 
   var saved = load();
   if (saved && saved.settings) state.settings = Object.assign(state.settings, saved.settings);
+  state.bestMoves = cleanBestMoves(saved && saved.bestMoves);
   applySettings();
   var params = new URLSearchParams(location.search);
   var startAt = parseInt(params.get('level'), 10) || (saved && saved.level) || 1;

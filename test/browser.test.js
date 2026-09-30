@@ -100,9 +100,11 @@ async function openTestPage() {
   }
 
   await page.goto(URL + '?level=1', { waitUntil: 'networkidle0' });
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => localStorage.setItem('ballsort.v1', JSON.stringify({ level: 1, settings: { sound: true, vibrate: true }, current: null })));
   await page.goto(URL, { waitUntil: 'networkidle0' });
   await sleep(300);
+  const legacySave = await page.evaluate(() => ({ level: window.__ballSort.state.level, bestMoves: window.__ballSort.state.bestMoves }));
+  if (legacySave.level !== 1 || Object.keys(legacySave.bestMoves).length) throw new Error('legacy save without best-move data did not load cleanly');
   await page.screenshot({ path: `${OUT}/ballsort-level1.png` });
   const toolbarLabels = await page.$$eval('.toolbar .tool-btn', buttons => buttons.map(button => {
     const label = button.querySelector('.tool-label');
@@ -244,6 +246,13 @@ async function openTestPage() {
   await sleep(900);
   const won = await page.evaluate(() => window.__ballSort.state.won && !document.getElementById('win').classList.contains('hidden'));
   if (!won) throw new Error('level 1 win not detected');
+  const firstBest = await page.evaluate(() => ({
+    text: document.getElementById('win-sub').textContent,
+    saved: JSON.parse(localStorage.getItem('ballsort.v1'))
+  }));
+  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.saved.level !== 2 || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
+    throw new Error('first level win did not record a personal best and save the next level immediately');
+  }
   let winFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('win').getAttribute('aria-modal'), hidden: document.getElementById('win').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
   if (winFocus.active !== 'btn-next' || winFocus.modal !== 'true' || winFocus.hidden !== 'false' || !winFocus.inert) throw new Error('win dialog did not enter modal focus state');
   await page.keyboard.press('Tab');
@@ -265,7 +274,36 @@ async function openTestPage() {
   await page.reload({ waitUntil: 'networkidle0' });
   lvl = await page.evaluate(() => window.__ballSort.state.level);
   if (lvl !== 2) throw new Error('progress not persisted');
+  const bestAfterReload = await page.evaluate(() => JSON.parse(localStorage.getItem('ballsort.v1')).bestMoves['1']);
+  if (bestAfterReload !== moves1) throw new Error('level 1 personal best did not survive advancing and reloading');
   console.log('progress persisted across reload (level 2)');
+
+  // Replaying the deterministic level at the same move count keeps its best
+  // and reports the existing record instead of claiming a new one.
+  await page.evaluate(() => window.__ballSort.startLevel(1)); await sleep(300);
+  const replayMoves = await solveCurrent(); await sleep(700);
+  const replayBest = await page.evaluate(() => ({
+    text: document.getElementById('win-sub').textContent,
+    moves: JSON.parse(localStorage.getItem('ballsort.v1')).bestMoves['1']
+  }));
+  if (replayMoves !== moves1 || replayBest.moves !== moves1 || replayBest.text !== `Solved in ${moves1} moves · Personal best: ${moves1} moves`) {
+    throw new Error('replaying a level at the same score changed or misreported its personal best');
+  }
+  await page.click('#btn-next'); await sleep(300);
+  await page.evaluate(() => window.__ballSort.startLevel(1, {
+    level: 1, tubes: [[0, 0], [0, 0], [1, 1, 1, 1], [2, 2, 2, 2], []],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  const fasterMoves = await solveCurrent(); await sleep(700);
+  const improvedBest = await page.evaluate(() => ({
+    text: document.getElementById('win-sub').textContent,
+    moves: JSON.parse(localStorage.getItem('ballsort.v1')).bestMoves['1']
+  }));
+  if (fasterMoves !== 1 || improvedBest.moves !== 1 || improvedBest.text !== 'Solved in 1 move · New personal best!') {
+    throw new Error('a faster replay did not replace the level personal best');
+  }
+  await page.click('#btn-next'); await sleep(300);
+  console.log('personal best survives replay, reports ties accurately, and improves on a faster solve');
 
   // A multi-ball move, its count/history, and its undo must survive reloads.
   await page.evaluate(() => window.__ballSort.startLevel(1, {
@@ -454,6 +492,17 @@ async function openTestPage() {
   await touch('#btn-close-settings'); await sleep(100);
   if (!(await page.$eval('#settings', el => el.classList.contains('hidden')))) throw new Error('touch Done control did not close settings');
   if ((await page.evaluate(() => document.activeElement.id)) !== 'btn-settings') throw new Error('touch close did not restore settings focus');
+
+  await page.evaluate(() => { window.confirm = () => true; });
+  await page.click('#btn-settings'); await page.click('#btn-reset'); await sleep(100);
+  const resetProgress = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('ballsort.v1'));
+    return { level: window.__ballSort.state.level, bestMoves: window.__ballSort.state.bestMoves, savedLevel: saved.level, savedBestMoves: saved.bestMoves };
+  });
+  if (resetProgress.level !== 1 || resetProgress.savedLevel !== 1 || Object.keys(resetProgress.bestMoves).length || Object.keys(resetProgress.savedBestMoves).length) {
+    throw new Error('reset progress did not clear personal-best records along with level progress');
+  }
+  console.log('explicit progress reset clears personal-best records');
 
   // privacy page
   const resp = await page.goto(URL + 'privacy.html');

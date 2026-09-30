@@ -19,6 +19,7 @@ A polished, relaxing **color-sorting puzzle** that works fully **offline**. It's
 - You can only pour onto a ball of the **same color** or into an **empty tube**, and only while the tube has room.
 - You win when every tube is either **full of one color** or **empty**.
 - **Hint** highlights one recommended legal move without changing the board or using a move.
+- Each win records your **personal best moves for that level** and keeps it across sessions; resetting progress clears these records.
 - **Undo** gives you 3 free undos per level. After that, a rewarded ad gives you 3 more.
 - **+1 Tube** adds an extra empty tube once per level (rewarded ad).
 - **Restart** (top left) resets the level. **Settings** (top right) toggles sound and vibration and lets you reset your progress.
@@ -29,7 +30,7 @@ A polished, relaxing **color-sorting puzzle** that works fully **offline**. It's
 - **Every level is guaranteed solvable.** Each generated board is checked by a built-in depth-first solver (`www/js/logic.js`), and boards that aren't solvable are rejected.
 - Smooth ball-lift and arc-pour animations, confetti win celebration, and haptics.
 - Sound effects synthesized with **WebAudio** (no audio files).
-- Progress is saved in `localStorage`, including a level you're partway through.
+- Progress is saved in `localStorage`, including a level you're partway through and per-level personal-best move counts. A completed level advances immediately, even if the game is closed before tapping Next Level.
 - Portrait, touch-first layout that respects safe areas and adapts to 1–3 rows of tubes.
 - No build step: open `www/index.html` or serve the folder.
 
