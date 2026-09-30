@@ -130,6 +130,7 @@
     el.className = 'tube';
     el.setAttribute('aria-label', tubeLabel(i, t));
     el.setAttribute('aria-pressed', i === state.selected ? 'true' : 'false');
+    el.setAttribute('aria-keyshortcuts', 'ArrowLeft ArrowRight ArrowUp ArrowDown');
     if (i >= L.colorsForLevel(state.level) + L.EMPTY_TUBES) el.classList.add('extra');
     if (L.isComplete(t, CAP)) el.classList.add('complete');
     el.dataset.index = i;
@@ -177,6 +178,47 @@
   }
 
   // ---------- input ----------
+  function navigateTube(e) {
+    var horizontal = 0, vertical = 0;
+    if (e.key === 'ArrowLeft') horizontal = -1;
+    else if (e.key === 'ArrowRight') horizontal = 1;
+    else if (e.key === 'ArrowUp') vertical = -1;
+    else if (e.key === 'ArrowDown') vertical = 1;
+    else return;
+    if (state.busy || state.won || activeModal) return;
+
+    var current = e.target.closest ? e.target.closest('.tube') : null;
+    if (!current || !board.contains(current)) return;
+    var rows = Array.prototype.slice.call(board.querySelectorAll('.tube-row'));
+    var rowIndex = rows.indexOf(current.parentElement);
+    if (rowIndex < 0) return;
+
+    var rowTubes = Array.prototype.slice.call(rows[rowIndex].querySelectorAll('.tube'));
+    var next = null;
+    if (horizontal) {
+      next = rowTubes[rowTubes.indexOf(current) + horizontal] || null;
+    } else {
+      var targetRow = rows[rowIndex + vertical];
+      if (targetRow) {
+        var currentRect = current.getBoundingClientRect();
+        var centerX = currentRect.left + currentRect.width / 2;
+        var closestDistance = Infinity;
+        Array.prototype.forEach.call(targetRow.querySelectorAll('.tube'), function (candidate) {
+          var rect = candidate.getBoundingClientRect();
+          var distance = Math.abs(rect.left + rect.width / 2 - centerX);
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            next = candidate;
+          }
+        });
+      }
+    }
+    if (next && !next.disabled) {
+      e.preventDefault();
+      next.focus();
+    }
+  }
+
   function onTube(i) {
     if (state.busy || state.won) return;
     var sel = state.selected;
@@ -419,6 +461,7 @@
   }
 
   // ---------- wire up ----------
+  board.addEventListener('keydown', navigateTube);
   $('btn-undo').addEventListener('click', undo);
   $('btn-tube').addEventListener('click', addTube);
   $('btn-restart').addEventListener('click', restart);

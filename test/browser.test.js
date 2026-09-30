@@ -52,9 +52,59 @@ let browser = null;
   const accessible = await page.evaluate(() => ({
     board: document.getElementById('board').getAttribute('role'),
     liveMoves: document.getElementById('moves').getAttribute('aria-live'),
-    tubes: [...document.querySelectorAll('.tube')].every(t => t.tagName === 'BUTTON' && t.type === 'button' && t.getAttribute('aria-label').startsWith('Tube ') && t.hasAttribute('aria-pressed'))
+    tubes: [...document.querySelectorAll('.tube')].every(t => t.tagName === 'BUTTON' && t.type === 'button' && t.getAttribute('aria-label').startsWith('Tube ') && t.hasAttribute('aria-pressed') && t.getAttribute('aria-keyshortcuts') === 'ArrowLeft ArrowRight ArrowUp ArrowDown')
   }));
   if (accessible.board !== 'group' || accessible.liveMoves !== 'polite' || !accessible.tubes) throw new Error('accessible board/tube semantics missing');
+
+  const navRows = await page.evaluate(() => [...document.querySelectorAll('#board .tube-row')].map(row => [...row.querySelectorAll('.tube')].map(t => t.dataset.index)));
+  if (navRows.length < 2 || navRows[0].length < 2) throw new Error('level 1 did not render a navigable tube grid');
+  const firstTube = navRows[0][0];
+  const lastTubeInFirstRow = navRows[0][navRows[0].length - 1];
+  await page.focus(`.tube[data-index="${firstTube}"]`);
+  await page.keyboard.press('ArrowUp');
+  if ((await page.evaluate(() => document.activeElement.dataset.index)) !== firstTube) throw new Error('ArrowUp wrapped past the top row');
+  const verticalTarget = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#board .tube-row')];
+    const source = rows[0].querySelector('.tube');
+    const x = source.getBoundingClientRect().left + source.getBoundingClientRect().width / 2;
+    return [...rows[1].querySelectorAll('.tube')].reduce((best, candidate) => {
+      if (!best) return candidate;
+      const rect = candidate.getBoundingClientRect();
+      const bestRect = best.getBoundingClientRect();
+      return Math.abs(rect.left + rect.width / 2 - x) < Math.abs(bestRect.left + bestRect.width / 2 - x) ? candidate : best;
+    }, null).dataset.index;
+  });
+  await page.keyboard.press('ArrowDown');
+  if ((await page.evaluate(() => document.activeElement.dataset.index)) !== verticalTarget) throw new Error('ArrowDown did not focus the nearest tube in the next row');
+  const verticalReturnTarget = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#board .tube-row')];
+    const source = document.activeElement;
+    const x = source.getBoundingClientRect().left + source.getBoundingClientRect().width / 2;
+    return [...rows[0].querySelectorAll('.tube')].reduce((best, candidate) => {
+      if (!best) return candidate;
+      const rect = candidate.getBoundingClientRect();
+      const bestRect = best.getBoundingClientRect();
+      return Math.abs(rect.left + rect.width / 2 - x) < Math.abs(bestRect.left + bestRect.width / 2 - x) ? candidate : best;
+    }, null).dataset.index;
+  });
+  await page.keyboard.press('ArrowUp');
+  if ((await page.evaluate(() => document.activeElement.dataset.index)) !== verticalReturnTarget) throw new Error('ArrowUp did not focus the nearest tube in the previous row');
+  await page.focus(`.tube[data-index="${firstTube}"]`);
+  await page.keyboard.press('ArrowLeft');
+  if ((await page.evaluate(() => document.activeElement.dataset.index)) !== firstTube) throw new Error('ArrowLeft wrapped past the first tube');
+  await page.keyboard.press('ArrowRight');
+  if ((await page.evaluate(() => document.activeElement.dataset.index)) !== navRows[0][1]) throw new Error('ArrowRight did not focus the next tube in the row');
+  await page.focus(`.tube[data-index="${lastTubeInFirstRow}"]`);
+  await page.keyboard.press('ArrowRight');
+  if ((await page.evaluate(() => document.activeElement.dataset.index)) !== lastTubeInFirstRow) throw new Error('ArrowRight wrapped to another row at the boundary');
+  await page.evaluate(index => { document.querySelector(`.tube[data-index="${index}"]`).disabled = true; }, navRows[0][1]);
+  await page.focus(`.tube[data-index="${firstTube}"]`);
+  await page.keyboard.press('ArrowRight');
+  if ((await page.evaluate(() => document.activeElement.dataset.index)) !== firstTube) throw new Error('ArrowRight skipped an unavailable adjacent tube');
+  await page.evaluate(index => { document.querySelector(`.tube[data-index="${index}"]`).disabled = false; }, navRows[0][1]);
+  const navigationState = await page.evaluate(() => ({ selected: window.__ballSort.state.selected, pressed: [...document.querySelectorAll('.tube')].some(t => t.getAttribute('aria-pressed') === 'true') }));
+  if (navigationState.selected !== -1 || navigationState.pressed) throw new Error('arrow navigation changed tube selection state');
+
   await page.focus('.tube[data-index="0"]');
   await page.keyboard.press('Enter');
   let selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
@@ -135,6 +185,8 @@ let browser = null;
   await page.click('#btn-settings'); await sleep(400);
   let settingsFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('settings').getAttribute('aria-modal'), hidden: document.getElementById('settings').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
   if (settingsFocus.active !== 'opt-sound' || settingsFocus.modal !== 'true' || settingsFocus.hidden !== 'false' || !settingsFocus.inert) throw new Error('settings dialog did not enter modal focus state');
+  await page.keyboard.press('ArrowRight');
+  if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('tube arrow navigation interfered with settings dialog focus');
   for (const id of ['opt-vibrate', 'btn-reset']) {
     await page.keyboard.press('Tab');
     if ((await page.evaluate(() => document.activeElement.id)) !== id) throw new Error('settings Tab order did not reach ' + id);
