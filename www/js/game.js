@@ -491,7 +491,7 @@
     }
     $('levels-help').textContent = 'Levels 1–' + state.unlockedLevel + ' are unlocked. Choosing another level replaces your current board.';
     $('btn-close-levels').textContent = 'Continue Level ' + state.level;
-    showModal('levels', $('btn-levels'));
+    showModal('levels', $('btn-levels'), list.querySelector('[aria-current="step"]'));
   }
 
   function chooseLevel(level) {
@@ -595,7 +595,7 @@
       return !el.disabled && !el.closest('.hidden') && el.getAttribute('aria-hidden') !== 'true';
     });
   }
-  function showModal(id, returnFocus) {
+  function showModal(id, returnFocus, initialFocus) {
     var modal = $(id);
     activeModal = modal;
     modalReturnFocus = returnFocus || null;
@@ -603,7 +603,7 @@
     modal.classList.remove('hidden');
     $('app').inert = true;
     var focusable = focusableIn(modal);
-    if (focusable.length) focusable[0].focus();
+    if (focusable.length) (focusable.indexOf(initialFocus) !== -1 ? initialFocus : focusable[0]).focus();
   }
   function hideModal(id, restoreFocus) {
     var modal = $(id);

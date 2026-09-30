@@ -522,9 +522,10 @@ async function openTestPage() {
     inert: document.getElementById('app').inert,
     levels: [...document.querySelectorAll('#level-list button')].map(button => Number(button.dataset.level)),
     current: document.querySelector('#level-list [aria-current="step"]')?.dataset.level,
-    currentName: document.querySelector('#level-list [aria-current="step"]')?.getAttribute('aria-label')
+    currentName: document.querySelector('#level-list [aria-current="step"]')?.getAttribute('aria-label'),
+    focusedLevel: document.activeElement && document.activeElement.dataset.level
   }));
-  if (picker.hidden !== 'false' || !picker.inert || JSON.stringify(picker.levels) !== JSON.stringify([1, 2]) || picker.current !== '2' || !/current level/.test(picker.currentName || '') || await page.$('#level-list [data-level="3"]')) {
+  if (picker.hidden !== 'false' || !picker.inert || JSON.stringify(picker.levels) !== JSON.stringify([1, 2]) || picker.current !== '2' || !/current level/.test(picker.currentName || '') || picker.focusedLevel !== '2' || await page.$('#level-list [data-level="3"]')) {
     throw new Error('level picker did not expose only unlocked levels and mark the current level: ' + JSON.stringify(picker));
   }
   console.log('compact mobile level-picker options remain at least 44×44px');
@@ -575,6 +576,34 @@ async function openTestPage() {
   await page.click('#level-list [data-level="2"]');
   if ((await page.evaluate(() => window.__ballSort.state.level)) !== 2) throw new Error('could not return to the highest unlocked level');
   console.log('level picker switches between unlocked levels, persists unlocks, and protects unfinished boards');
+
+  // Opening a long picker should focus and reveal the current level rather
+  // than stranding keyboard users at Level 1 above the scroll position.
+  await page.evaluate(() => {
+    window.__ballSort.state.unlockedLevel = 48;
+    window.__ballSort.startLevel(48);
+  });
+  const saveBeforeLongPicker = await page.evaluate(() => localStorage.getItem('ballsort.v1'));
+  await page.click('#btn-levels');
+  const longPicker = await page.evaluate(() => {
+    const list = document.getElementById('level-list');
+    const current = list.querySelector('[aria-current="step"]');
+    const optionRect = current.getBoundingClientRect();
+    const listRect = list.getBoundingClientRect();
+    return {
+      focused: document.activeElement === current,
+      currentLevel: current.dataset.level,
+      visible: optionRect.top >= listRect.top && optionRect.bottom <= listRect.bottom,
+      scrolled: list.scrollTop > 0,
+      saved: localStorage.getItem('ballsort.v1')
+    };
+  });
+  if (!longPicker.focused || longPicker.currentLevel !== '48' || !longPicker.visible || !longPicker.scrolled || longPicker.saved !== saveBeforeLongPicker) {
+    throw new Error('opening a long level picker did not focus and reveal the current level without changing the save: ' + JSON.stringify(longPicker));
+  }
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.__ballSort.startLevel(2));
+  console.log('long level picker opens focused on the current level and scrolls it into view without changing the save');
 
   // Restart remains one-tap on a fresh board, but protects real progress just
   // like leaving a level does; cancellation must preserve the complete save.
