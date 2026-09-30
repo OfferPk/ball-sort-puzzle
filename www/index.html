@@ -25,9 +25,9 @@
       </button>
     </header>
 
-    <div class="subbar"><span id="moves">Moves: 0</span><span id="colors-info"></span></div>
+    <div class="subbar"><span id="moves" role="status" aria-live="polite" aria-atomic="true">Moves: 0</span><span id="colors-info"></span></div>
 
-    <main id="board" aria-label="Game board"></main>
+    <main id="board" role="group" aria-label="Game board" aria-busy="false"></main>
 
     <div id="toast" class="toast" role="status"></div>
 
@@ -63,7 +63,7 @@
       <label class="row"><span>Sound effects</span><input type="checkbox" id="opt-sound" class="switch" /></label>
       <label class="row"><span>Vibration</span><input type="checkbox" id="opt-vibrate" class="switch" /></label>
       <div class="row"><span>How to play</span></div>
-      <p class="help">Tap a tube to pick up its top ball(s), then tap another tube to pour. Balls can only be poured onto the same color or into an empty tube. Sort every color into its own tube to win!</p>
+      <p class="help">Select a tube to pick up its top ball(s), then select another tube to pour. Balls can only be poured onto the same color or into an empty tube. Sort every color into its own tube to win!</p>
       <div class="row buttons">
         <button class="small-btn danger" id="btn-reset">Reset progress</button>
         <a class="small-btn" href="privacy.html" target="_blank" rel="noopener">Privacy</a>

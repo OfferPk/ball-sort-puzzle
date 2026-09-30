@@ -38,6 +38,30 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(300);
   await page.screenshot({ path: `${OUT}/ballsort-level1.png` });
 
+  const accessible = await page.evaluate(() => ({
+    board: document.getElementById('board').getAttribute('role'),
+    liveMoves: document.getElementById('moves').getAttribute('aria-live'),
+    tubes: [...document.querySelectorAll('.tube')].every(t => t.tagName === 'BUTTON' && t.type === 'button' && t.getAttribute('aria-label').startsWith('Tube ') && t.hasAttribute('aria-pressed'))
+  }));
+  if (accessible.board !== 'group' || accessible.liveMoves !== 'polite' || !accessible.tubes) throw new Error('accessible board/tube semantics missing');
+  await page.focus('.tube[data-index="0"]');
+  await page.keyboard.press('Enter');
+  let selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
+  if (selected !== 'true') throw new Error('keyboard selection did not update pressed state');
+  await page.keyboard.press('Enter');
+  selected = await page.$eval('.tube[data-index="0"]', el => el.getAttribute('aria-pressed'));
+  if (selected !== 'false') throw new Error('keyboard deselection did not update pressed state');
+
+  const keyboardMove = await page.evaluate(() => window.__ballSort.logic.solve(window.__ballSort.state.tubes)[0]);
+  await page.focus(`.tube[data-index="${keyboardMove[0]}"]`);
+  await page.keyboard.press('Enter');
+  await page.focus(`.tube[data-index="${keyboardMove[1]}"]`);
+  await page.keyboard.press('Enter');
+  await waitIdle();
+  const focusedTube = await page.evaluate(() => document.activeElement && document.activeElement.dataset.index);
+  if (focusedTube !== String(keyboardMove[1])) throw new Error('keyboard focus was not restored after move');
+  await page.evaluate(() => window.__ballSort.startLevel(1));
+
   // play level 1 by taps
   const moves1 = await solveCurrent();
   await sleep(900);

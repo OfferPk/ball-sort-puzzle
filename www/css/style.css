@@ -51,6 +51,7 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 .tube-row { display: flex; justify-content: center; gap: calc(var(--ball) * 0.32); }
 .tube {
   position: relative;
+  appearance: none; -webkit-appearance: none;
   width: calc(var(--ball) + 14px);
   height: calc(var(--ball) * 4 + var(--gap) * 3 + var(--ball) * 0.55 + 8px);
   padding: 0 5px 6px;
@@ -62,6 +63,10 @@ svg { width: 26px; height: 26px; fill: currentColor; }
   display: flex; flex-direction: column-reverse; align-items: center; gap: var(--gap);
   cursor: pointer;
   transition: transform .18s ease, box-shadow .2s, border-color .2s;
+}
+.tube:focus-visible, .icon-btn:focus-visible, .tool-btn:focus-visible, .big-btn:focus-visible, .small-btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
 }
 .tube::before { /* rim */
   content: ""; position: absolute; top: -3px; left: -7px; right: -7px; height: 6px;

@@ -20,6 +20,7 @@
     '#3d405b', // navy
     '#a3e635'  // lime
   ];
+  var COLOR_NAMES = ['red', 'blue', 'yellow', 'green', 'purple', 'orange', 'cyan', 'pink', 'brown', 'white', 'navy', 'lime'];
 
   var $ = function (id) { return document.getElementById(id); };
   var board = $('board');
@@ -98,6 +99,8 @@
 
   function render(full) {
     var lay = layout();
+    var active = document.activeElement;
+    var focusIndex = active && active.classList && active.classList.contains('tube') ? parseInt(active.dataset.index, 10) : -1;
     board.innerHTML = '';
     var idx = 0;
     for (var r = 0; r < lay.rows; r++) {
@@ -108,22 +111,36 @@
       board.appendChild(row);
     }
     updateHud();
+    if (focusIndex >= 0 && focusIndex < state.tubes.length) tubeEl(focusIndex).focus();
+  }
+
+  function tubeLabel(i, tube) {
+    var label = 'Tube ' + (i + 1) + ', ';
+    if (!tube.length) return label + 'empty';
+    label += tube.length + ' of ' + CAP + ' balls; bottom to top: ';
+    label += tube.map(function (color) { return COLOR_NAMES[color % COLOR_NAMES.length]; }).join(', ');
+    if (L.isComplete(tube, CAP)) label += '; complete';
+    return label;
   }
 
   function makeTube(i) {
     var t = state.tubes[i];
-    var el = document.createElement('div');
+    var el = document.createElement('button');
+    el.type = 'button';
     el.className = 'tube';
+    el.setAttribute('aria-label', tubeLabel(i, t));
+    el.setAttribute('aria-pressed', i === state.selected ? 'true' : 'false');
     if (i >= L.colorsForLevel(state.level) + L.EMPTY_TUBES) el.classList.add('extra');
     if (L.isComplete(t, CAP)) el.classList.add('complete');
     el.dataset.index = i;
     for (var k = 0; k < t.length; k++) {
-      var b = document.createElement('div');
+      var b = document.createElement('span');
       b.className = 'ball';
+      b.setAttribute('aria-hidden', 'true');
       b.style.setProperty('--c', COLORS[t[k] % COLORS.length]);
       el.appendChild(b);
     }
-    el.addEventListener('pointerdown', function (e) { e.preventDefault(); onTube(i); });
+    el.addEventListener('click', function () { onTube(i); });
     return el;
   }
 
@@ -139,6 +156,7 @@
   function setLift(i, on) {
     var el = tubeEl(i); if (!el) return;
     el.classList.toggle('selected', on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
     var balls = el.querySelectorAll('.ball');
     var run = L.topRun(state.tubes[i]);
     var lift = liftAmount(i);
@@ -193,6 +211,7 @@
   // ---------- move + animation ----------
   function doMove(from, to, n) {
     state.busy = true;
+    board.setAttribute('aria-busy', 'true');
     state.selected = -1;
     var ball = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ball'));
     var gap = 3;
@@ -235,6 +254,7 @@
       flies.forEach(function (f) { f.remove(); });
       Sound.drop(); buzz(10);
       state.busy = false;
+      board.setAttribute('aria-busy', 'false');
       if (L.isComplete(state.tubes[to], CAP)) {
         var el = tubeEl(to); if (el) el.classList.add('pop');
         Sound.complete();
