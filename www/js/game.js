@@ -589,6 +589,11 @@
 
   // ---------- settings ----------
   function openSettings() {
+    if (state.busy) {
+      toast('Finish the move to open Settings.');
+      return;
+    }
+    Sound.click();
     $('opt-sound').checked = state.settings.sound;
     $('opt-vibrate').checked = state.settings.vibrate;
     showModal('settings', $('btn-settings'));
@@ -636,7 +641,7 @@
   $('btn-restart').addEventListener('click', restart);
   $('btn-next').addEventListener('click', nextLevel);
   $('btn-replay').addEventListener('click', replayLevel);
-  $('btn-settings').addEventListener('click', function () { Sound.click(); openSettings(); });
+  $('btn-settings').addEventListener('click', openSettings);
   $('btn-close-settings').addEventListener('click', function () { hideModal('settings', true); });
   $('opt-sound').addEventListener('change', function (e) { state.settings.sound = e.target.checked; applySettings(); save(); });
   $('opt-vibrate').addEventListener('change', function (e) { state.settings.vibrate = e.target.checked; save(); });

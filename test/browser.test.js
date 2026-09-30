@@ -673,6 +673,45 @@ async function openTestPage() {
   await page.evaluate(() => window.__ballSort.startLevel(2));
   console.log('long level picker opens focused on the current level and scrolls it into view without changing the save');
 
+  // Settings must not interrupt a move whose completion callback still owns
+  // the board; otherwise Reset Progress can be overwritten by that stale move.
+  await page.evaluate(() => window.__ballSort.startLevel(2, {
+    level: 2, tubes: [[0, 1], [1], [], [2, 2, 2, 2], [0, 0]],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  await tap(0); await tap(1);
+  const settingsDuringMove = await page.evaluate(() => ({
+    busy: window.__ballSort.state.busy,
+    ariaBusy: document.getElementById('board').getAttribute('aria-busy')
+  }));
+  if (!settingsDuringMove.busy || settingsDuringMove.ariaBusy !== 'true') throw new Error('move fixture did not enter its in-flight state');
+  await touch('#btn-settings');
+  const blockedSettings = await page.evaluate(() => ({
+    visible: !document.getElementById('settings').classList.contains('hidden'),
+    message: document.getElementById('toast').textContent,
+    role: document.getElementById('toast').getAttribute('role')
+  }));
+  if (blockedSettings.visible || blockedSettings.message !== 'Finish the move to open Settings.' || blockedSettings.role !== 'status') {
+    throw new Error('Settings opened during a move or did not explain the brief wait: ' + JSON.stringify(blockedSettings));
+  }
+  await waitIdle();
+  const settledMove = await page.evaluate(() => ({
+    busy: window.__ballSort.state.busy,
+    moves: window.__ballSort.state.moves,
+    history: window.__ballSort.state.history,
+    tubes: window.__ballSort.state.tubes,
+    savedMoves: JSON.parse(localStorage.getItem('ballsort.v1')).current.moves
+  }));
+  if (settledMove.busy || settledMove.moves !== 1 || settledMove.savedMoves !== 1 ||
+      JSON.stringify(settledMove.history) !== '[[0,1,1]]' ||
+      JSON.stringify(settledMove.tubes.slice(0, 2)) !== '[[0],[1,1]]') {
+    throw new Error('the move did not settle and save correctly after Settings was deferred: ' + JSON.stringify(settledMove));
+  }
+  await touch('#btn-settings');
+  if (!(await page.$eval('#settings', el => !el.classList.contains('hidden')))) throw new Error('Settings remained unavailable after the move finished');
+  await touch('#btn-close-settings');
+  console.log('Settings explains and waits out an in-flight move; the move save stays intact and Settings reopens afterward');
+
   // Restart remains one-tap on a fresh board, but protects real progress just
   // like leaving a level does; cancellation must preserve the complete save.
   await page.evaluate(() => window.__ballSort.startLevel(2));
