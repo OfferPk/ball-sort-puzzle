@@ -210,15 +210,40 @@ let browser = null;
   if (lvl !== 2) throw new Error('progress not persisted');
   console.log('progress persisted across reload (level 2)');
 
-  // undo & extra tube
-  const before = await page.evaluate(() => JSON.stringify(window.__ballSort.state.tubes));
-  const sol2 = await page.evaluate(() => window.__ballSort.logic.solve(window.__ballSort.state.tubes));
-  await tap(sol2[0][0]); await tap(sol2[0][1]); await waitIdle();
+  // A multi-ball move, its count/history, and its undo must survive reloads.
+  await page.evaluate(() => window.__ballSort.startLevel(1, {
+    level: 1, tubes: [[0, 1, 1], [1], [], [], []], history: [],
+    undos: 3, extraUsed: false, moves: 0
+  }));
+  const snapshotProgress = () => page.evaluate(() => ({
+    level: window.__ballSort.state.level,
+    tubes: window.__ballSort.state.tubes,
+    history: window.__ballSort.state.history,
+    undos: window.__ballSort.state.undos,
+    moves: window.__ballSort.state.moves,
+    hudMoves: document.getElementById('moves').textContent,
+    undoDisabled: document.getElementById('btn-undo').disabled
+  }));
+  const before = await snapshotProgress();
+  await tap(0); await tap(1); await waitIdle();
+  const moved = await snapshotProgress();
+  if (JSON.stringify(moved.tubes) !== JSON.stringify([[0], [1, 1, 1], [], [], []]) ||
+      JSON.stringify(moved.history) !== JSON.stringify([[0, 1, 2]]) || moved.moves !== 1 || moved.undos !== 3 || moved.hudMoves !== 'Moves: 1' || moved.undoDisabled) {
+    throw new Error('multi-ball move did not record one move and its undo history');
+  }
+  await page.reload({ waitUntil: 'networkidle0' });
+  const restoredMove = await snapshotProgress();
+  if (JSON.stringify(restoredMove) !== JSON.stringify(moved)) throw new Error('saved move, move count, or undo history did not restore consistently');
   await page.click('#btn-undo'); await sleep(100);
-  const after = await page.evaluate(() => JSON.stringify(window.__ballSort.state.tubes));
-  const undos = await page.evaluate(() => window.__ballSort.state.undos);
-  if (before !== after || undos !== 2) throw new Error('undo failed');
-  console.log('undo restores state, undos left =', undos);
+  const undone = await snapshotProgress();
+  if (JSON.stringify(undone.tubes) !== JSON.stringify(before.tubes) || undone.moves !== 0 || undone.undos !== 2 || undone.history.length !== 0 || undone.hudMoves !== 'Moves: 0' || !undone.undoDisabled) {
+    throw new Error('undo did not restore the original board and decrement one move/undo');
+  }
+  await page.reload({ waitUntil: 'networkidle0' });
+  const restoredUndo = await snapshotProgress();
+  if (JSON.stringify(restoredUndo) !== JSON.stringify(undone)) throw new Error('undone board, move count, or remaining undos did not persist');
+  console.log('multi-ball move and undo state, counters, and history survive reloads');
+  await page.evaluate(() => window.__ballSort.startLevel(2));
   const n0 = await page.evaluate(() => window.__ballSort.state.tubes.length);
   await page.click('#btn-tube'); await sleep(100);
   const n1 = await page.evaluate(() => window.__ballSort.state.tubes.length);
