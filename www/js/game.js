@@ -69,6 +69,7 @@
     state.selected = -1;
     state.won = false;
     state.busy = false;
+    $('next-challenge').textContent = '';
     if (resume && resume.level === level && resume.tubes && resume.tubes.length) {
       state.tubes = resume.tubes;
       state.history = resume.history || [];
@@ -393,6 +394,17 @@
     state.selected = -1;
   }
 
+  function nextChallenge(level) {
+    var nextLevel = level + 1;
+    var currentColors = L.colorsForLevel(level);
+    var nextColors = L.colorsForLevel(nextLevel);
+    if (nextColors > currentColors) return 'Next level: ' + nextColors + ' colors — a new color is unlocked!';
+    if (currentColors >= L.MAX_COLORS) return 'Next level: ' + nextColors + ' colors · all colors unlocked';
+    var unlockLevel = nextLevel;
+    while (L.colorsForLevel(unlockLevel) === currentColors) unlockLevel++;
+    return 'Next: ' + nextColors + ' colors · ' + L.colorsForLevel(unlockLevel) + ' colors at Level ' + unlockLevel;
+  }
+
   function onWin() {
     state.won = true;
     updateHud();
@@ -401,6 +413,7 @@
     if (improved) state.bestMoves[state.level] = state.moves;
     $('win-sub').textContent = 'Solved in ' + state.moves + ' move' + (state.moves === 1 ? '' : 's') +
       (improved ? ' · New personal best!' : ' · Personal best: ' + previousBest + ' moves');
+    $('next-challenge').textContent = nextChallenge(state.level);
     save();
     setTimeout(function () {
       Sound.win(); buzz(40);

@@ -257,6 +257,24 @@ async function openTestPage() {
   await assertTubeAccessibility('keyboard move');
   await page.evaluate(() => window.__ballSort.startLevel(1));
 
+  // A win previews the current tier and next color milestone. Crossing a tier
+  // announces the newly added color, and replay clears the old preview.
+  await page.evaluate(() => window.__ballSort.startLevel(3, {
+    level: 3, tubes: [[0, 0], [0, 0], [1, 1, 1, 1], [2, 2, 2, 2], []],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  await tap(0); await tap(1); await waitIdle(); await sleep(450);
+  const unlockPreview = await page.evaluate(() => ({
+    text: document.getElementById('next-challenge').textContent,
+    describedby: document.getElementById('win').getAttribute('aria-describedby')
+  }));
+  if (unlockPreview.text !== 'Next level: 4 colors — a new color is unlocked!' || !unlockPreview.describedby.split(' ').includes('next-challenge')) {
+    throw new Error('win dialog did not announce the upcoming color unlock accessibly');
+  }
+  await page.click('#btn-replay'); await sleep(200);
+  if ((await page.$eval('#next-challenge', el => el.textContent)) !== '') throw new Error('replaying a level left a stale progression preview visible to assistive technology');
+  await page.evaluate(() => window.__ballSort.startLevel(1));
+
   // play level 1 by taps
   const moves1 = await solveCurrent();
   await assertTubeAccessibility('completed level');
@@ -265,10 +283,12 @@ async function openTestPage() {
   if (!won) throw new Error('level 1 win not detected');
   const firstBest = await page.evaluate(() => ({
     text: document.getElementById('win-sub').textContent,
+    nextChallenge: document.getElementById('next-challenge').textContent,
+    winDescribedby: document.getElementById('win').getAttribute('aria-describedby'),
     progress: document.getElementById('sort-progress').textContent,
     saved: JSON.parse(localStorage.getItem('ballsort.v1'))
   }));
-  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.progress !== 'Sorted: 3 / 3' || firstBest.saved.level !== 2 || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
+  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.nextChallenge !== 'Next: 3 colors · 4 colors at Level 4' || !firstBest.winDescribedby.split(' ').includes('next-challenge') || firstBest.progress !== 'Sorted: 3 / 3' || firstBest.saved.level !== 2 || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
     throw new Error('first level win did not record a personal best and save the next level immediately');
   }
   let winFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('win').getAttribute('aria-modal'), hidden: document.getElementById('win').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
