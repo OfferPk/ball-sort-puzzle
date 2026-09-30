@@ -75,6 +75,12 @@ svg { width: 26px; height: 26px; fill: currentColor; }
   content: ""; position: absolute; top: -3px; left: -7px; right: -7px; height: 6px;
   border-radius: 4px; background: rgba(255,255,255,.6);
 }
+.tube-hit-area {
+  position: absolute; z-index: 1; top: 50%; left: 50%;
+  width: max(100%, 44px); height: max(100%, 44px);
+  transform: translate(-50%, -50%); border-radius: 8px;
+  background: transparent; pointer-events: auto;
+}
 .tube.selected { border-color: var(--accent); }
 .tube.selected::before { background: var(--accent); }
 .tube.complete { border-color: #9ef01a; box-shadow: 0 0 18px rgba(158,240,26,.55), inset 0 -6px 18px rgba(0,0,0,.18); }

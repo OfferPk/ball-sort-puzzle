@@ -173,6 +173,42 @@ async function openTestPage() {
   await page.reload({ waitUntil: 'networkidle0' });
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 0 / 3') throw new Error('sorted-color progress did not restore correctly after a level transition');
 
+  // High-color boards keep a comfortable touch target even when the visible
+  // tubes must shrink to fit a small phone in portrait or compact landscape.
+  for (const viewport of [{ width: 320, height: 480 }, { width: 568, height: 320 }]) {
+    await page.setViewport({ ...viewport, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await page.goto(URL + '?level=30', { waitUntil: 'networkidle0' });
+    const targets = await page.evaluate(() => [...document.querySelectorAll('.tube')].map(tube => {
+      const box = tube.getBoundingClientRect();
+      const hit = tube.querySelector('.tube-hit-area');
+      const target = hit.getBoundingClientRect();
+      return {
+        index: Number(tube.dataset.index), visual: { left: box.left, right: box.right, top: box.top, bottom: box.bottom },
+        target: { left: target.left, right: target.right, width: target.width, height: target.height },
+        hidden: hit.getAttribute('aria-hidden')
+      };
+    }));
+    if (targets.length !== 14 || targets.some(tube => tube.target.width < 44 || tube.target.height < 44 ||
+        tube.target.left < 0 || tube.target.right > viewport.width || tube.hidden !== 'true' ||
+        tube.visual.left < 0 || tube.visual.right > viewport.width)) {
+      throw new Error(`level 30 tube targets did not fit at ${viewport.width}x${viewport.height}: ${JSON.stringify(targets)}`);
+    }
+    const first = targets[0];
+    const x = first.visual.left - 1;
+    const y = (first.visual.top + first.visual.bottom) / 2;
+    const hitClass = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className, { x, y });
+    if (hitClass !== 'tube-hit-area') throw new Error(`outside-edge tap did not land on the expanded target at ${viewport.width}x${viewport.height}`);
+    await page.touchscreen.tap(x, y);
+    if ((await page.evaluate(() => window.__ballSort.state.selected)) !== 0) {
+      throw new Error(`expanded edge target did not select Tube 1 at ${viewport.width}x${viewport.height}`);
+    }
+    await assertTubeAccessibility(`expanded touch target at ${viewport.width}x${viewport.height}`);
+  }
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await page.goto(URL + '?level=1', { waitUntil: 'networkidle0' });
+  await page.evaluate(() => history.replaceState({}, '', location.pathname));
+  console.log('level 30 tube targets stay at least 44px wide and edge taps work on compact phone layouts');
+
   const hintBefore = await page.evaluate(() => {
     const state = window.__ballSort.state;
     return {

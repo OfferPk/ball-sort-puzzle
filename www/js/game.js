@@ -180,6 +180,10 @@
     var el = document.createElement('button');
     el.type = 'button';
     el.className = 'tube';
+    var hitTarget = document.createElement('span');
+    hitTarget.className = 'tube-hit-area';
+    hitTarget.setAttribute('aria-hidden', 'true');
+    el.appendChild(hitTarget);
     el.setAttribute('aria-label', tubeLabel(i, t));
     el.setAttribute('aria-pressed', i === state.selected ? 'true' : 'false');
     el.setAttribute('aria-keyshortcuts', 'ArrowLeft ArrowRight ArrowUp ArrowDown');
