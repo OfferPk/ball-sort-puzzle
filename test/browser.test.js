@@ -501,6 +501,59 @@ async function openTestPage() {
   if ((await page.evaluate(() => window.__ballSort.state.level)) !== 2) throw new Error('could not return to the highest unlocked level');
   console.log('level picker switches between unlocked levels, persists unlocks, and protects unfinished boards');
 
+  // Restart remains one-tap on a fresh board, but protects real progress just
+  // like leaving a level does; cancellation must preserve the complete save.
+  await page.evaluate(() => window.__ballSort.startLevel(2));
+  let freshRestartPrompt = null;
+  const observeFreshRestartPrompt = dialog => { freshRestartPrompt = dialog.message(); dialog.dismiss(); };
+  page.on('dialog', observeFreshRestartPrompt);
+  await touch('#btn-restart'); await sleep(100);
+  page.off('dialog', observeFreshRestartPrompt);
+  if (freshRestartPrompt || await page.evaluate(() => window.__ballSort.state.moves !== 0 || window.__ballSort.state.history.length !== 0)) {
+    throw new Error('restarting an untouched board should remain immediate and preserve its zero-move state');
+  }
+
+  await page.evaluate(() => window.__ballSort.startLevel(2, {
+    level: 2, tubes: [[0, 1], [1], [], [2, 2, 2, 2], [0, 0]],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  await tap(0); await tap(1); await waitIdle();
+  const restartSnapshot = () => page.evaluate(() => ({
+    level: window.__ballSort.state.level,
+    tubes: JSON.stringify(window.__ballSort.state.tubes),
+    history: JSON.stringify(window.__ballSort.state.history),
+    moves: window.__ballSort.state.moves,
+    undos: window.__ballSort.state.undos,
+    extraUsed: window.__ballSort.state.extraUsed,
+    best: JSON.stringify(window.__ballSort.state.bestMoves),
+    unlocked: window.__ballSort.state.unlockedLevel,
+    progress: document.getElementById('sort-progress').textContent,
+    hudMoves: document.getElementById('moves').textContent,
+    saved: localStorage.getItem('ballsort.v1')
+  }));
+  const progressedBoard = await restartSnapshot();
+  let restartPrompt = '';
+  page.once('dialog', async dialog => { restartPrompt = dialog.message(); await dialog.dismiss(); });
+  await touch('#btn-restart');
+  const canceledRestart = await restartSnapshot();
+  if (!/^Restart Level 2\?/.test(restartPrompt) || JSON.stringify(canceledRestart) !== JSON.stringify(progressedBoard)) {
+    throw new Error('canceling a progressed-board restart did not preserve its board, counters, undo state, and save');
+  }
+
+  restartPrompt = '';
+  page.once('dialog', async dialog => { restartPrompt = dialog.message(); await dialog.accept(); });
+  await touch('#btn-restart');
+  await page.waitForFunction(() => window.__ballSort.state.level === 2 && window.__ballSort.state.moves === 0 && window.__ballSort.state.history.length === 0);
+  const restartedBoard = await restartSnapshot();
+  if (!/^Restart Level 2\?/.test(restartPrompt) || restartedBoard.moves !== 0 || restartedBoard.history !== '[]' ||
+      restartedBoard.undos !== 3 || restartedBoard.extraUsed || restartedBoard.best !== progressedBoard.best ||
+      restartedBoard.unlocked !== progressedBoard.unlocked || restartedBoard.hudMoves !== 'Moves: 0' ||
+      JSON.parse(restartedBoard.saved).current.moves !== 0 ||
+      (await page.evaluate(() => document.activeElement && document.activeElement.dataset.index)) !== '0') {
+    throw new Error('confirming restart did not reset the board, retain long-term progress, and return focus to tube 1');
+  }
+  console.log('restart confirms only after progress; cancel preserves the save and confirm resets the board');
+
   // persistence: reload keeps level 2
   await page.reload({ waitUntil: 'networkidle0' });
   lvl = await page.evaluate(() => window.__ballSort.state.level);

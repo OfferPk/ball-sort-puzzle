@@ -426,10 +426,18 @@
     });
   }
 
+  function hasCurrentBoardProgress() {
+    return state.moves > 0 || state.history.length > 0 || state.undos < FREE_UNDOS || state.extraUsed;
+  }
+
   function restart() {
     if (state.busy) return;
+    if (hasCurrentBoardProgress() &&
+        !window.confirm('Restart Level ' + state.level + '? Your current board and move history will be cleared.')) return;
     Sound.click();
     startLevel(state.level);
+    var firstTube = tubeEl(0);
+    if (firstTube) firstTube.focus();
   }
 
   function clearSelection() {
@@ -481,7 +489,7 @@
 
   function chooseLevel(level) {
     if (level === state.level) { hideModal('levels', true); return; }
-    if ((state.moves > 0 || state.history.length > 0 || state.undos < FREE_UNDOS || state.extraUsed) &&
+    if (hasCurrentBoardProgress() &&
         !window.confirm('Leave Level ' + state.level + '? Your current board will be replaced.')) return;
     hideModal('levels', false);
     startLevel(level);
