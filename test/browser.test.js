@@ -132,10 +132,16 @@ async function openTestPage() {
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not reflect the level color count');
   await tap(2); await tap(1); await waitIdle();
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 3 / 4') throw new Error('sorted-color progress did not update after completing a tube');
+  await page.reload({ waitUntil: 'networkidle0' });
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 3 / 4') throw new Error('sorted-color progress did not restore after reload with a newly completed tube');
   await page.click('#btn-undo');
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not update after undo');
+  await page.reload({ waitUntil: 'networkidle0' });
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not restore after undo and reload');
   await page.evaluate(() => window.__ballSort.startLevel(1));
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 0 / 3') throw new Error('new level did not reset sorted-color progress');
+  await page.reload({ waitUntil: 'networkidle0' });
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 0 / 3') throw new Error('sorted-color progress did not restore correctly after a level transition');
 
   const hintBefore = await page.evaluate(() => {
     const state = window.__ballSort.state;
@@ -267,6 +273,8 @@ async function openTestPage() {
   }
   let winFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('win').getAttribute('aria-modal'), hidden: document.getElementById('win').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
   if (winFocus.active !== 'btn-next' || winFocus.modal !== 'true' || winFocus.hidden !== 'false' || !winFocus.inert) throw new Error('win dialog did not enter modal focus state');
+  const replayButton = await page.$eval('#btn-replay', el => ({ tag: el.tagName, type: el.type, text: el.textContent.trim() }));
+  if (replayButton.tag !== 'BUTTON' || replayButton.type !== 'button' || replayButton.text !== 'Replay Level') throw new Error('win dialog replay action is not a semantic, labeled button');
   await page.keyboard.press('Tab');
   await shiftTab();
   await page.evaluate(() => document.getElementById('btn-settings').focus());
@@ -276,9 +284,30 @@ async function openTestPage() {
   if (!(await page.$eval('#win', el => !el.classList.contains('hidden')))) throw new Error('Escape unexpectedly dismissed the win dialog');
   await page.screenshot({ path: `${OUT}/ballsort-win.png` });
   console.log(`level 1 solved by taps in ${moves1} moves, win overlay shown`);
+  await page.click('#btn-replay'); await sleep(300);
+  const replayStart = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('ballsort.v1'));
+    return {
+      level: window.__ballSort.state.level, moves: window.__ballSort.state.moves,
+      won: window.__ballSort.state.won, progress: document.getElementById('sort-progress').textContent,
+      winHidden: document.getElementById('win').classList.contains('hidden'),
+      best: window.__ballSort.state.bestMoves['1'], savedLevel: saved.level,
+      savedMoves: saved.current && saved.current.moves, savedBest: saved.bestMoves['1']
+    };
+  });
+  if (replayStart.level !== 1 || replayStart.moves !== 0 || replayStart.won || replayStart.progress !== 'Sorted: 0 / 3' || !replayStart.winHidden || replayStart.best !== moves1 || replayStart.savedLevel !== 1 || replayStart.savedMoves !== 0 || replayStart.savedBest !== moves1) {
+    throw new Error('replay action did not restart the same level, reset its sorted count, and preserve personal-best progress');
+  }
+  const retryMoves = await solveCurrent(); await sleep(700);
+  const retryBest = await page.evaluate(() => ({ text: document.getElementById('win-sub').textContent, best: JSON.parse(localStorage.getItem('ballsort.v1')).bestMoves['1'] }));
+  if (retryMoves !== moves1 || retryBest.best !== moves1 || retryBest.text !== `Solved in ${moves1} moves · Personal best: ${moves1} moves`) {
+    throw new Error('replayed level did not preserve or accurately report the existing personal best');
+  }
+  console.log('win dialog replays the same level and preserves its personal-best record');
   await page.click('#btn-next'); await sleep(300);
   let lvl = await page.evaluate(() => window.__ballSort.state.level);
   if (lvl !== 2) throw new Error('did not advance');
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 0 / 3') throw new Error('advancing to the next level did not reset sorted-color progress');
   const focusAfterWin = await page.evaluate(() => document.activeElement && document.activeElement.dataset.index);
   if (focusAfterWin !== '0') throw new Error('focus was not moved to the new board after advancing');
 
@@ -286,6 +315,7 @@ async function openTestPage() {
   await page.reload({ waitUntil: 'networkidle0' });
   lvl = await page.evaluate(() => window.__ballSort.state.level);
   if (lvl !== 2) throw new Error('progress not persisted');
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 0 / 3') throw new Error('sorted-color progress was incorrect after reloading the next level');
   const bestAfterReload = await page.evaluate(() => JSON.parse(localStorage.getItem('ballsort.v1')).bestMoves['1']);
   if (bestAfterReload !== moves1) throw new Error('level 1 personal best did not survive advancing and reloading');
   console.log('progress persisted across reload (level 2)');

@@ -419,6 +419,14 @@
     if (firstTube) firstTube.focus();
   }
 
+  function replayLevel() {
+    hideModal('win', false);
+    stopConfetti();
+    startLevel(state.level);
+    var firstTube = tubeEl(0);
+    if (firstTube) firstTube.focus();
+  }
+
   // ---------- toast ----------
   var toastTimer = null;
   function toast(msg) {
@@ -503,6 +511,7 @@
   $('btn-tube').addEventListener('click', addTube);
   $('btn-restart').addEventListener('click', restart);
   $('btn-next').addEventListener('click', nextLevel);
+  $('btn-replay').addEventListener('click', replayLevel);
   $('btn-settings').addEventListener('click', function () { Sound.click(); openSettings(); });
   $('btn-close-settings').addEventListener('click', function () { hideModal('settings', true); });
   $('opt-sound').addEventListener('change', function (e) { state.settings.sound = e.target.checked; applySettings(); save(); });

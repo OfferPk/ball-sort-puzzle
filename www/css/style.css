@@ -145,6 +145,7 @@ svg { width: 26px; height: 26px; fill: currentColor; }
   font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 #c47a2c, 0 10px 20px rgba(0,0,0,.3);
   transition: transform .12s;
 }
+.replay-btn { display: block; width: 100%; margin-top: 18px; cursor: pointer; font-weight: 700; }
 .row { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px; font-size: 16px; text-align: left; }
 .row.buttons { gap: 10px; }
 .help { text-align: left; font-size: 14px; opacity: .85; margin: 0 2px 6px; line-height: 1.4; }
