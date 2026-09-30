@@ -39,7 +39,7 @@
     selected: -1,
     busy: false,
     won: false,
-    settings: { sound: true, vibrate: true }
+    settings: { sound: true, vibrate: true, symbols: false }
   };
 
   // ---------- persistence ----------
@@ -207,6 +207,7 @@
       var b = document.createElement('span');
       b.className = 'ball';
       b.setAttribute('aria-hidden', 'true');
+      b.dataset.symbol = String((t[k] % COLORS.length) + 1);
       b.style.setProperty('--c', COLORS[t[k] % COLORS.length]);
       el.appendChild(b);
     }
@@ -642,9 +643,13 @@
     Sound.click();
     $('opt-sound').checked = state.settings.sound;
     $('opt-vibrate').checked = state.settings.vibrate;
+    $('opt-symbols').checked = state.settings.symbols;
     showModal('settings', $('btn-settings'));
   }
-  function applySettings() { Sound.setEnabled(state.settings.sound); }
+  function applySettings() {
+    Sound.setEnabled(state.settings.sound);
+    document.body.classList.toggle('symbols-on', state.settings.symbols);
+  }
 
   // ---------- modal focus ----------
   var activeModal = null;
@@ -691,6 +696,7 @@
   $('btn-close-settings').addEventListener('click', function () { hideModal('settings', true); });
   $('opt-sound').addEventListener('change', function (e) { state.settings.sound = e.target.checked; applySettings(); save(); });
   $('opt-vibrate').addEventListener('change', function (e) { state.settings.vibrate = e.target.checked; save(); });
+  $('opt-symbols').addEventListener('change', function (e) { state.settings.symbols = e.target.checked; applySettings(); save(); });
   $('btn-reset').addEventListener('click', function () {
     if (!confirm('Reset all progress and go back to level 1?')) return;
     hideModal('settings', true);
@@ -738,6 +744,7 @@
 
   var saved = load();
   if (saved && saved.settings) state.settings = Object.assign(state.settings, saved.settings);
+  state.settings.symbols = state.settings.symbols === true;
   state.bestMoves = cleanBestMoves(saved && saved.bestMoves);
   state.bestStars = cleanBestStars(saved && saved.bestStars);
   state.unlockedLevel = cleanUnlockedLevel(saved);

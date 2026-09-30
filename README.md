@@ -24,7 +24,7 @@ A polished, relaxing **color-sorting puzzle** that works fully **offline**. It's
 - Completed levels can also earn **1–3 move-efficiency stars**. The three-star move target is a solver-verified solution for that exact seeded board (not a claim of a mathematically shortest solution); lower ratings allow up to 1.5× and 2× that move count. Stars are optional records and do not affect completion or level unlocks.
 - **Undo** gives you 3 free undos per level. After that, a rewarded ad gives you 3 more.
 - **+1 Tube** adds an extra empty tube once per level (rewarded ad).
-- **Restart** (top left) resets the level. **Settings** (top right) toggles sound and vibration and lets you reset your progress.
+- **Restart** (top left) resets the level. **Settings** (top right) toggles sound and vibration, offers optional color numbers (1–12) on the balls, and lets you reset your progress. Color numbers are off by default and saved with your settings.
 
 ## Features
 

@@ -126,8 +126,77 @@ async function openTestPage() {
   await page.evaluate(() => localStorage.setItem('ballsort.v1', JSON.stringify({ level: 1, settings: { sound: true, vibrate: true }, current: null })));
   await page.goto(URL, { waitUntil: 'networkidle0' });
   await sleep(300);
-  const legacySave = await page.evaluate(() => ({ level: window.__ballSort.state.level, bestMoves: window.__ballSort.state.bestMoves }));
+  const legacySave = await page.evaluate(() => ({
+    level: window.__ballSort.state.level, bestMoves: window.__ballSort.state.bestMoves,
+    symbols: window.__ballSort.state.settings.symbols,
+    symbolsOn: document.body.classList.contains('symbols-on'), symbolsSwitch: document.getElementById('opt-symbols').checked,
+    symbolContent: getComputedStyle(document.querySelector('.ball'), '::after').content
+  }));
   if (legacySave.level !== 1 || Object.keys(legacySave.bestMoves).length) throw new Error('legacy save without best-move data did not load cleanly');
+  if (legacySave.symbols !== false || legacySave.symbolsOn || legacySave.symbolsSwitch || legacySave.symbolContent !== 'none') throw new Error('color symbols changed the default ball visuals or legacy-save defaults');
+  const symbolBaseline = await page.evaluate(() => {
+    const game = window.__ballSort.state, saved = JSON.parse(localStorage.getItem('ballsort.v1'));
+    return {
+      game: { level: game.level, tubes: JSON.stringify(game.tubes), history: JSON.stringify(game.history), moves: game.moves, selected: game.selected, undos: game.undos, extraUsed: game.extraUsed, bestMoves: JSON.stringify(game.bestMoves), bestStars: JSON.stringify(game.bestStars), unlockedLevel: game.unlockedLevel },
+      labels: [...document.querySelectorAll('.tube')].map(tube => tube.getAttribute('aria-label')),
+      progress: { level: saved.level, unlockedLevel: saved.unlockedLevel, current: saved.current, bestMoves: saved.bestMoves, bestStars: saved.bestStars, sound: saved.settings.sound, vibrate: saved.settings.vibrate }
+    };
+  });
+  await page.click('#btn-settings');
+  await page.click('#opt-symbols');
+  const symbolsEnabled = await page.evaluate(() => {
+    const game = window.__ballSort.state, saved = JSON.parse(localStorage.getItem('ballsort.v1'));
+    return {
+      game: { level: game.level, tubes: JSON.stringify(game.tubes), history: JSON.stringify(game.history), moves: game.moves, selected: game.selected, undos: game.undos, extraUsed: game.extraUsed, bestMoves: JSON.stringify(game.bestMoves), bestStars: JSON.stringify(game.bestStars), unlockedLevel: game.unlockedLevel },
+      labels: [...document.querySelectorAll('.tube')].map(tube => tube.getAttribute('aria-label')),
+      progress: { level: saved.level, unlockedLevel: saved.unlockedLevel, current: saved.current, bestMoves: saved.bestMoves, bestStars: saved.bestStars, sound: saved.settings.sound, vibrate: saved.settings.vibrate },
+      enabled: game.settings.symbols && saved.settings.symbols === true && document.body.classList.contains('symbols-on') && document.getElementById('opt-symbols').checked,
+      balls: [...document.querySelectorAll('.ball')].map(ball => ({ symbol: ball.dataset.symbol, content: getComputedStyle(ball, '::after').content }))
+    };
+  });
+  if (!symbolsEnabled.enabled || JSON.stringify(symbolsEnabled.game) !== JSON.stringify(symbolBaseline.game) ||
+      JSON.stringify(symbolsEnabled.labels) !== JSON.stringify(symbolBaseline.labels) || JSON.stringify(symbolsEnabled.progress) !== JSON.stringify(symbolBaseline.progress) ||
+      !symbolsEnabled.balls.length || symbolsEnabled.balls.some(ball => !/^(?:[1-9]|1[0-2])$/.test(ball.symbol) || ball.content === 'none')) {
+    throw new Error('enabling color symbols changed gameplay, saves, or color labels, or did not show a numbered symbol');
+  }
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.click('#btn-settings');
+  const persistedSymbols = await page.evaluate(() => ({
+    enabled: window.__ballSort.state.settings.symbols && document.body.classList.contains('symbols-on') && document.getElementById('opt-symbols').checked,
+    tubes: JSON.stringify(window.__ballSort.state.tubes)
+  }));
+  if (!persistedSymbols.enabled || persistedSymbols.tubes !== symbolBaseline.game.tubes) throw new Error('the opt-in symbols setting or in-progress puzzle did not survive reload');
+  await page.click('#btn-close-settings');
+  const symbolsSave = await page.evaluate(() => localStorage.getItem('ballsort.v1'));
+  await page.evaluate(() => window.__ballSort.startLevel(30));
+  const fullPalette = await page.evaluate(() => {
+    const palette = new Map();
+    document.querySelectorAll('.ball').forEach(ball => palette.set(ball.dataset.symbol, ball.style.getPropertyValue('--c')));
+    return [...palette.entries()].sort((a, b) => Number(a[0]) - Number(b[0]));
+  });
+  if (fullPalette.length !== 12 || fullPalette.some(([symbol], index) => Number(symbol) !== index + 1) || new Set(fullPalette.map(([, color]) => color)).size !== 12) {
+    throw new Error('color symbols did not uniquely distinguish all 12 ball colors');
+  }
+  await page.evaluate(saved => localStorage.setItem('ballsort.v1', saved), symbolsSave);
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.click('#btn-settings');
+  await page.click('#opt-symbols');
+  const symbolsDisabled = await page.evaluate(() => ({
+    enabled: window.__ballSort.state.settings.symbols || document.body.classList.contains('symbols-on') || document.getElementById('opt-symbols').checked || JSON.parse(localStorage.getItem('ballsort.v1')).settings.symbols,
+    tubes: JSON.stringify(window.__ballSort.state.tubes),
+    labels: [...document.querySelectorAll('.tube')].map(tube => tube.getAttribute('aria-label')),
+    content: getComputedStyle(document.querySelector('.ball'), '::after').content
+  }));
+  if (symbolsDisabled.enabled || symbolsDisabled.tubes !== symbolBaseline.game.tubes || JSON.stringify(symbolsDisabled.labels) !== JSON.stringify(symbolBaseline.labels) || symbolsDisabled.content !== 'none') {
+    throw new Error('disabling color symbols changed the puzzle/color labels or left symbols visible');
+  }
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.click('#btn-settings');
+  if (await page.evaluate(() => window.__ballSort.state.settings.symbols || document.body.classList.contains('symbols-on') || document.getElementById('opt-symbols').checked)) {
+    throw new Error('the opt-out color-symbol setting did not persist across reload');
+  }
+  await page.click('#btn-close-settings');
+  console.log('optional color symbols are off by default, distinguish all 12 colors, persist when enabled, and preserve puzzle state, saves, and color labels');
   await page.screenshot({ path: `${OUT}/ballsort-level1.png` });
   const toolbarLabels = await page.$$eval('.toolbar .tool-btn', buttons => buttons.map(button => {
     const label = button.querySelector('.tool-label');
@@ -1010,7 +1079,7 @@ async function openTestPage() {
   if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state\./.test(howToPlay) || !/Hint: Shows one recommended legal move without changing the board\./.test(howToPlay) || !/Levels: Tap the level number to revisit any unlocked level\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, accessibility, hint, or level-picker guidance');
   await page.keyboard.press('ArrowRight');
   if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('tube arrow navigation interfered with settings dialog focus');
-  for (const id of ['opt-vibrate', 'btn-reset']) {
+  for (const id of ['opt-vibrate', 'opt-symbols', 'btn-reset']) {
     await page.keyboard.press('Tab');
     if ((await page.evaluate(() => document.activeElement.id)) !== id) throw new Error('settings Tab order did not reach ' + id);
   }
