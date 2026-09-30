@@ -93,6 +93,24 @@ async function openTestPage() {
       }
     }
   }
+  async function assertProgressAccessibility(context, expectedText) {
+    const actual = await page.$eval('#sort-progress', element => ({
+      text: element.textContent.trim(), role: element.getAttribute('role'),
+      live: element.getAttribute('aria-live'), atomic: element.getAttribute('aria-atomic')
+    }));
+    if (actual.text !== expectedText || actual.role !== 'status' || actual.live !== 'polite' || actual.atomic !== 'true') {
+      throw new Error(`${context}: sorted progress is not announced as a polite atomic status: ${JSON.stringify(actual)}`);
+    }
+    const tree = await page.accessibility.snapshot({ interestingOnly: false });
+    let exposed = false;
+    const containsExpectedText = node => node.name === expectedText || (node.children || []).some(containsExpectedText);
+    const visit = node => {
+      if (node.role === 'status' && containsExpectedText(node)) exposed = true;
+      for (const child of node.children || []) visit(child);
+    };
+    visit(tree);
+    if (!exposed) throw new Error(`${context}: sorted progress is missing from the accessibility tree as a status`);
+  }
   async function solveCurrent(shotAt) {
     const sol = await page.evaluate(() => window.__ballSort.logic.solve(window.__ballSort.state.tubes, { nodeLimit: 500000 }));
     if (!sol) throw new Error('no solution');
@@ -124,9 +142,13 @@ async function openTestPage() {
   const accessible = await page.evaluate(() => ({
     board: document.getElementById('board').getAttribute('role'),
     liveMoves: document.getElementById('moves').getAttribute('aria-live'),
+    sortedRole: document.getElementById('sort-progress').getAttribute('role'),
+    sortedLive: document.getElementById('sort-progress').getAttribute('aria-live'),
+    sortedAtomic: document.getElementById('sort-progress').getAttribute('aria-atomic'),
     tubes: [...document.querySelectorAll('.tube')].every(t => t.tagName === 'BUTTON' && t.type === 'button' && t.getAttribute('aria-label').startsWith('Tube ') && t.hasAttribute('aria-pressed') && t.getAttribute('aria-keyshortcuts') === 'ArrowLeft ArrowRight ArrowUp ArrowDown')
   }));
-  if (accessible.board !== 'group' || accessible.liveMoves !== 'polite' || !accessible.tubes) throw new Error('accessible board/tube semantics missing');
+  if (accessible.board !== 'group' || accessible.liveMoves !== 'polite' || accessible.sortedRole !== 'status' || accessible.sortedLive !== 'polite' || accessible.sortedAtomic !== 'true' || !accessible.tubes) throw new Error('accessible board/tube/progress status semantics missing');
+  await assertProgressAccessibility('initial sorted progress', 'Sorted: 0 / 3');
   await page.evaluate(() => window.__ballSort.startLevel(1, { level: 1, tubes: [[0, 1, 2, 0], [], [2, 2, 2, 2], [1, 2], []], history: [], undos: 3, extraUsed: false, moves: 0 }));
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 1 / 3') throw new Error('sorted-color progress did not count a completed tube');
   await assertTubeAccessibility('label fixture');
@@ -135,12 +157,15 @@ async function openTestPage() {
     history: [], undos: 3, extraUsed: false, moves: 0
   }));
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not reflect the level color count');
+  await assertProgressAccessibility('level color-count update', 'Sorted: 2 / 4');
   await tap(2); await tap(1); await waitIdle();
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 3 / 4') throw new Error('sorted-color progress did not update after completing a tube');
+  await assertProgressAccessibility('tube completion', 'Sorted: 3 / 4');
   await page.reload({ waitUntil: 'networkidle0' });
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 3 / 4') throw new Error('sorted-color progress did not restore after reload with a newly completed tube');
   await page.click('#btn-undo');
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not update after undo');
+  await assertProgressAccessibility('undo', 'Sorted: 2 / 4');
   await page.reload({ waitUntil: 'networkidle0' });
   if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not restore after undo and reload');
   await page.evaluate(() => window.__ballSort.startLevel(1));
