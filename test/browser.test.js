@@ -123,8 +123,19 @@ async function openTestPage() {
   }));
   if (accessible.board !== 'group' || accessible.liveMoves !== 'polite' || !accessible.tubes) throw new Error('accessible board/tube semantics missing');
   await page.evaluate(() => window.__ballSort.startLevel(1, { level: 1, tubes: [[0, 1, 2, 0], [], [2, 2, 2, 2], [1, 2], []], history: [], undos: 3, extraUsed: false, moves: 0 }));
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 1 / 3') throw new Error('sorted-color progress did not count a completed tube');
   await assertTubeAccessibility('label fixture');
+  await page.evaluate(() => window.__ballSort.startLevel(4, {
+    level: 4, tubes: [[0, 0, 0, 0], [1, 1, 1], [1], [2, 2, 2], [2], [3, 3, 3, 3]],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not reflect the level color count');
+  await tap(2); await tap(1); await waitIdle();
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 3 / 4') throw new Error('sorted-color progress did not update after completing a tube');
+  await page.click('#btn-undo');
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 2 / 4') throw new Error('sorted-color progress did not update after undo');
   await page.evaluate(() => window.__ballSort.startLevel(1));
+  if ((await page.$eval('#sort-progress', el => el.textContent)) !== 'Sorted: 0 / 3') throw new Error('new level did not reset sorted-color progress');
 
   const hintBefore = await page.evaluate(() => {
     const state = window.__ballSort.state;
@@ -248,9 +259,10 @@ async function openTestPage() {
   if (!won) throw new Error('level 1 win not detected');
   const firstBest = await page.evaluate(() => ({
     text: document.getElementById('win-sub').textContent,
+    progress: document.getElementById('sort-progress').textContent,
     saved: JSON.parse(localStorage.getItem('ballsort.v1'))
   }));
-  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.saved.level !== 2 || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
+  if (firstBest.text !== `Solved in ${moves1} moves · New personal best!` || firstBest.progress !== 'Sorted: 3 / 3' || firstBest.saved.level !== 2 || firstBest.saved.current !== null || firstBest.saved.bestMoves['1'] !== moves1) {
     throw new Error('first level win did not record a personal best and save the next level immediately');
   }
   let winFocus = await page.evaluate(() => ({ active: document.activeElement.id, modal: document.getElementById('win').getAttribute('aria-modal'), hidden: document.getElementById('win').getAttribute('aria-hidden'), inert: document.getElementById('app').inert }));
@@ -316,6 +328,7 @@ async function openTestPage() {
     history: window.__ballSort.state.history,
     undos: window.__ballSort.state.undos,
     moves: window.__ballSort.state.moves,
+    sortProgress: document.getElementById('sort-progress').textContent,
     extraUsed: window.__ballSort.state.extraUsed,
     hudMoves: document.getElementById('moves').textContent,
     undoDisabled: document.getElementById('btn-undo').disabled,

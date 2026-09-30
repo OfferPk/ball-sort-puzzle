@@ -84,7 +84,6 @@
       state.moves = 0;
     }
     $('level-num').textContent = level;
-    $('colors-info').textContent = L.colorsForLevel(level) + ' colors';
     render(true);
     save();
   }
@@ -182,6 +181,10 @@
 
   function updateHud() {
     $('moves').textContent = 'Moves: ' + state.moves;
+    var sorted = state.tubes.reduce(function (count, tube) {
+      return count + (L.isComplete(tube, CAP) ? 1 : 0);
+    }, 0);
+    $('sort-progress').textContent = 'Sorted: ' + sorted + ' / ' + L.colorsForLevel(state.level);
     var ub = $('undo-badge');
     if (state.undos > 0) { ub.textContent = state.undos; ub.classList.remove('ad'); }
     else { ub.textContent = 'AD'; ub.classList.add('ad'); }

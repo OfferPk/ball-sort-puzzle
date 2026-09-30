@@ -18,6 +18,7 @@ A polished, relaxing **color-sorting puzzle** that works fully **offline**. It's
 - **Tap a tube** to lift its top ball(s), then **tap another tube** to pour them.
 - You can only pour onto a ball of the **same color** or into an **empty tube**, and only while the tube has room.
 - You win when every tube is either **full of one color** or **empty**.
+- A live **Sorted** counter shows how many color tubes are complete and updates after moves and undo.
 - **Hint** highlights one recommended legal move without changing the board or using a move.
 - Each win records your **personal best moves for that level** and keeps it across sessions; resetting progress clears these records.
 - **Undo** gives you 3 free undos per level. After that, a rewarded ad gives you 3 more.
