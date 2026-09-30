@@ -320,7 +320,10 @@
       var t = state.tubes[i];
       if (t.length && !L.isComplete(t, CAP)) {
         setLift(sel, false); state.selected = i; setLift(i, true); updateDestinationHints(true); Sound.select();
-      } else { shake(i); }
+      } else {
+        shake(i);
+        if (L.isComplete(t, CAP)) toast('Tube ' + (i + 1) + ' is full. Choose a highlighted destination.');
+      }
       return;
     }
     doMove(sel, i, n);

@@ -406,6 +406,32 @@ async function openTestPage() {
   }
   await assertTubeAccessibility('touch move after destination preview');
   console.log('touch destination previews announce and mark legal moves, update on source switch, clear on cancel, and preserve saves until a pour');
+
+  // Tapping a completed tube as a destination explains why the pour failed,
+  // while keeping the source selected and preserving the in-progress save.
+  await page.evaluate(() => window.__ballSort.startLevel(1, {
+    level: 1, tubes: [[2, 2, 2, 2], [0, 0, 0, 1], [1, 1, 1, 0], [], []],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  const blockedBaseline = await page.evaluate(() => ({
+    tubes: JSON.stringify(window.__ballSort.state.tubes), history: JSON.stringify(window.__ballSort.state.history),
+    moves: window.__ballSort.state.moves, undos: window.__ballSort.state.undos, saved: localStorage.getItem('ballsort.v1')
+  }));
+  await tap(1); await tap(0);
+  await page.waitForFunction(() => document.getElementById('toast').textContent === 'Tube 1 is full. Choose a highlighted destination.');
+  const blockedMove = await page.evaluate(() => ({
+    selected: window.__ballSort.state.selected,
+    tubes: JSON.stringify(window.__ballSort.state.tubes), history: JSON.stringify(window.__ballSort.state.history),
+    moves: window.__ballSort.state.moves, undos: window.__ballSort.state.undos, saved: localStorage.getItem('ballsort.v1'),
+    message: document.getElementById('toast').textContent, role: document.getElementById('toast').getAttribute('role'),
+    shake: document.querySelector('.tube[data-index="0"]').classList.contains('shake')
+  }));
+  if (blockedMove.selected !== 1 || blockedMove.message !== 'Tube 1 is full. Choose a highlighted destination.' ||
+      blockedMove.role !== 'status' || !blockedMove.shake) throw new Error('blocked pour did not retain source selection and announce the full destination');
+  for (const key of ['tubes', 'history', 'moves', 'undos', 'saved']) {
+    if (blockedMove[key] !== blockedBaseline[key]) throw new Error(`blocked pour changed ${key}`);
+  }
+  console.log('a blocked pour into a full tube is announced without changing the selected source, board, or save');
   await page.evaluate(() => window.__ballSort.startLevel(1));
 
   // play level 1 by taps
