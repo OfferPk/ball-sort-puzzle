@@ -57,6 +57,11 @@ async function openTestPage() {
             name += `${tube.length} of ${capacity} balls; bottom to top: ${tube.map(color => colorNames[color % colorNames.length]).join(', ')}`;
             if (window.__ballSort.logic.isComplete(tube, capacity)) name += '; complete';
           }
+          const selected = window.__ballSort.state.selected;
+          if (selected !== -1 && selected !== index && window.__ballSort.logic.canPour(window.__ballSort.state.tubes, selected, index, capacity)) {
+            const source = window.__ballSort.state.tubes[selected];
+            name += `; legal destination for ${colorNames[source[source.length - 1] % colorNames.length]}`;
+          }
           return { index, name, pressed: index === window.__ballSort.state.selected };
         })
       };
@@ -273,6 +278,73 @@ async function openTestPage() {
   }
   await page.click('#btn-replay'); await sleep(200);
   if ((await page.$eval('#next-challenge', el => el.textContent)) !== '') throw new Error('replaying a level left a stale progression preview visible to assistive technology');
+  await page.evaluate(() => window.__ballSort.startLevel(1));
+
+  // Selecting a source immediately marks every legal destination visually and
+  // in each tube's accessible name, announces the choices, and never mutates a
+  // save until a legal pour is made.
+  await page.evaluate(() => window.__ballSort.startLevel(1, {
+    level: 1, tubes: [[0, 1], [1], [], [2, 2, 2, 2], [0, 0]],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  const previewBaseline = await page.evaluate(() => ({
+    tubes: JSON.stringify(window.__ballSort.state.tubes), history: JSON.stringify(window.__ballSort.state.history),
+    moves: window.__ballSort.state.moves, saved: localStorage.getItem('ballsort.v1')
+  }));
+  await tap(0);
+  let destinationPreview = await page.evaluate(() => ({
+    selected: window.__ballSort.state.selected,
+    legal: [...document.querySelectorAll('.tube.legal-target')].map(tube => Number(tube.dataset.index)),
+    message: document.getElementById('toast').textContent,
+    toastRole: document.getElementById('toast').getAttribute('role'),
+    saved: localStorage.getItem('ballsort.v1'), tubes: JSON.stringify(window.__ballSort.state.tubes),
+    history: JSON.stringify(window.__ballSort.state.history), moves: window.__ballSort.state.moves,
+    visual: (() => { const tube = document.querySelector('.tube[data-index="1"]'); return { rim: getComputedStyle(tube, '::before').backgroundColor, marker: getComputedStyle(tube, '::after').content }; })()
+  }));
+  if (destinationPreview.selected !== 0 || JSON.stringify(destinationPreview.legal) !== JSON.stringify([1, 2]) || destinationPreview.message !== 'Blue selected. Legal destinations: Tube 2 and Tube 3.' || destinationPreview.toastRole !== 'status' || destinationPreview.visual.marker !== '"✓"') {
+    throw new Error('selecting a source did not clearly announce and mark only its legal destinations: ' + JSON.stringify(destinationPreview));
+  }
+  for (const key of ['saved', 'tubes', 'history', 'moves']) {
+    if (destinationPreview[key] !== previewBaseline[key]) throw new Error(`destination preview changed ${key}`);
+  }
+  await assertTubeAccessibility('touch source legal destinations');
+
+  // Tapping another movable source replaces both the selection and its legal
+  // target list; tapping it again clears the preview without changing state.
+  await tap(4);
+  destinationPreview = await page.evaluate(() => ({
+    selected: window.__ballSort.state.selected,
+    legal: [...document.querySelectorAll('.tube.legal-target')].map(tube => Number(tube.dataset.index)),
+    message: document.getElementById('toast').textContent
+  }));
+  if (destinationPreview.selected !== 4 || JSON.stringify(destinationPreview.legal) !== JSON.stringify([2]) || destinationPreview.message !== 'Red selected. Legal destinations: Tube 3.') {
+    throw new Error('switching source tubes left stale or inaccurate legal destinations: ' + JSON.stringify(destinationPreview));
+  }
+  await assertTubeAccessibility('switched source legal destination');
+  await tap(4);
+  destinationPreview = await page.evaluate(() => ({
+    selected: window.__ballSort.state.selected,
+    legal: [...document.querySelectorAll('.tube.legal-target')].map(tube => Number(tube.dataset.index)),
+    message: document.getElementById('toast').textContent,
+    saved: localStorage.getItem('ballsort.v1'), moves: window.__ballSort.state.moves
+  }));
+  if (destinationPreview.selected !== -1 || destinationPreview.legal.length || destinationPreview.message !== 'Selection cleared.' || destinationPreview.saved !== previewBaseline.saved || destinationPreview.moves !== previewBaseline.moves) {
+    throw new Error('deselecting a source did not clear its destination preview without changing the board');
+  }
+  await assertTubeAccessibility('cleared source destination preview');
+
+  await tap(0); await tap(1); await waitIdle();
+  const pouredPreview = await page.evaluate(() => ({
+    selected: window.__ballSort.state.selected,
+    legal: [...document.querySelectorAll('.tube.legal-target')].length,
+    source: window.__ballSort.state.tubes[0], target: window.__ballSort.state.tubes[1],
+    moves: window.__ballSort.state.moves, savedMoves: JSON.parse(localStorage.getItem('ballsort.v1')).current.moves
+  }));
+  if (pouredPreview.selected !== -1 || pouredPreview.legal || JSON.stringify(pouredPreview.source) !== '[0]' || JSON.stringify(pouredPreview.target) !== '[1,1]' || pouredPreview.moves !== 1 || pouredPreview.savedMoves !== 1) {
+    throw new Error('legal destination feedback did not clear cleanly after a real touch pour: ' + JSON.stringify(pouredPreview));
+  }
+  await assertTubeAccessibility('touch move after destination preview');
+  console.log('touch destination previews announce and mark legal moves, update on source switch, clear on cancel, and preserve saves until a pour');
   await page.evaluate(() => window.__ballSort.startLevel(1));
 
   // play level 1 by taps

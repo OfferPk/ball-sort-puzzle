@@ -79,6 +79,15 @@ svg { width: 26px; height: 26px; fill: currentColor; }
 .tube.selected::before { background: var(--accent); }
 .tube.complete { border-color: #9ef01a; box-shadow: 0 0 18px rgba(158,240,26,.55), inset 0 -6px 18px rgba(0,0,0,.18); }
 .tube.complete::before { background: #9ef01a; }
+.tube.legal-target { border-color: #6fffe9; box-shadow: 0 0 0 4px rgba(111,255,233,.22), inset 0 -6px 18px rgba(0,0,0,.18); }
+.tube.legal-target::before { background: #6fffe9; }
+.tube.legal-target::after {
+  content: "✓"; position: absolute; z-index: 1; top: -10px; right: -6px;
+  width: 20px; height: 20px; border: 1px solid #fff; border-radius: 50%;
+  background: #6fffe9; color: #124b46; display: grid; place-items: center;
+  font-size: 14px; font-weight: 900; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  pointer-events: none;
+}
 .tube.shake { animation: shake .3s; }
 .tube.pop { animation: pop .45s; }
 .tube.hint-source { outline: 3px solid #ffd166; outline-offset: 3px; }

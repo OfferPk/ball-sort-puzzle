@@ -137,11 +137,42 @@
 
   function tubeLabel(i, tube) {
     var label = 'Tube ' + (i + 1) + ', ';
-    if (!tube.length) return label + 'empty';
-    label += tube.length + ' of ' + CAP + ' balls; bottom to top: ';
-    label += tube.map(function (color) { return COLOR_NAMES[color % COLOR_NAMES.length]; }).join(', ');
-    if (L.isComplete(tube, CAP)) label += '; complete';
+    if (!tube.length) label += 'empty';
+    else {
+      label += tube.length + ' of ' + CAP + ' balls; bottom to top: ';
+      label += tube.map(function (color) { return COLOR_NAMES[color % COLOR_NAMES.length]; }).join(', ');
+      if (L.isComplete(tube, CAP)) label += '; complete';
+    }
+    if (state.selected !== -1 && state.selected !== i && L.canPour(state.tubes, state.selected, i, CAP)) {
+      var selectedTube = state.tubes[state.selected];
+      label += '; legal destination for ' + COLOR_NAMES[selectedTube[selectedTube.length - 1] % COLOR_NAMES.length];
+    }
     return label;
+  }
+
+  function updateDestinationHints(announce) {
+    var destinations = [];
+    for (var i = 0; i < state.tubes.length; i++) {
+      var el = tubeEl(i);
+      if (!el) continue;
+      var legal = state.selected !== -1 && i !== state.selected && L.canPour(state.tubes, state.selected, i, CAP);
+      el.classList.toggle('legal-target', legal);
+      el.setAttribute('aria-label', tubeLabel(i, state.tubes[i]));
+      if (legal) destinations.push('Tube ' + (i + 1));
+    }
+    if (!announce || state.selected === -1) return;
+
+    var source = state.tubes[state.selected];
+    var colorName = COLOR_NAMES[source[source.length - 1] % COLOR_NAMES.length];
+    colorName = colorName.charAt(0).toUpperCase() + colorName.slice(1);
+    if (!destinations.length) {
+      toast('No legal destinations for the selected ' + colorName.toLowerCase() + ' ball.');
+    } else {
+      var destinationText = destinations.length === 1 ? destinations[0] :
+        destinations.length === 2 ? destinations.join(' and ') :
+        destinations.slice(0, -1).join(', ') + ', and ' + destinations[destinations.length - 1];
+      toast(colorName + ' selected. Legal destinations: ' + destinationText + '.');
+    }
   }
 
   function makeTube(i) {
@@ -274,16 +305,17 @@
       if (!state.tubes[i].length || L.isComplete(state.tubes[i], CAP)) { shake(i); return; }
       state.selected = i;
       setLift(i, true);
+      updateDestinationHints(true);
       Sound.select(); buzz(8);
       return;
     }
-    if (sel === i) { setLift(i, false); state.selected = -1; Sound.click(); return; }
+    if (sel === i) { setLift(i, false); state.selected = -1; updateDestinationHints(false); toast('Selection cleared.'); Sound.click(); return; }
     var n = L.pourCount(state.tubes, sel, i, CAP);
     if (!n) {
       // switch selection to the tapped tube if it has pickable balls
       var t = state.tubes[i];
       if (t.length && !L.isComplete(t, CAP)) {
-        setLift(sel, false); state.selected = i; setLift(i, true); Sound.select();
+        setLift(sel, false); state.selected = i; setLift(i, true); updateDestinationHints(true); Sound.select();
       } else { shake(i); }
       return;
     }
@@ -303,6 +335,7 @@
     state.busy = true;
     board.setAttribute('aria-busy', 'true');
     state.selected = -1;
+    updateDestinationHints(false);
     var ball = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ball'));
     var gap = 3;
     var srcEl = tubeEl(from), dstEl = tubeEl(to);
@@ -402,6 +435,7 @@
   function clearSelection() {
     if (state.selected !== -1) setLift(state.selected, false);
     state.selected = -1;
+    updateDestinationHints(false);
   }
 
   function nextChallenge(level) {
