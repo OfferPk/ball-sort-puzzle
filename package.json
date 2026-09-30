@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "serve": "npx --yes http-server www -p 8080 -c-1",
-    "test": "node test/logic.test.js",
+    "test": "node test/logic.test.js && node test/ads.test.js",
     "sync": "npx cap sync android"
   },
   "dependencies": {

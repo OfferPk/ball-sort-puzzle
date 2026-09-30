@@ -2,19 +2,31 @@
 // win detection, undo, extra tube, persistence, and saves phone screenshots.
 // Usage: node test/browser.test.js http://localhost:8765/ [outdir]
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const URL = process.argv[2] || 'http://localhost:8765/';
 const OUT = process.argv[3] || '/workspace';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'ballsort-chrome-profile-'));
 
 let browser = null;
-(async () => {
-  browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+let page = null;
+const errors = [];
+function launchBrowser() {
+  return puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', userDataDir: PROFILE, headless: 'new', args: ['--no-sandbox'] });
+}
+async function openTestPage() {
+  page = await browser.newPage();
   await page.emulate({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
     userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Mobile Safari/537.36' });
-  const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  return page;
+}
+(async () => {
+  browser = await launchBrowser();
+  await openTestPage();
 
   async function tap(i) {
     const el = await page.$(`.tube[data-index="${i}"]`);
@@ -296,6 +308,65 @@ let browser = null;
   }
   console.log('rewarded undo grant and one-credit undo persist across reloads');
 
+  // Exercise the native bridge contract with a mocked Capacitor plugin, then
+  // restart the whole Chromium process against its persistent on-disk profile.
+  await page.evaluate(() => {
+    window.__rewardBridgeMock = { phase: 'unearned', listener: null, shows: 0 };
+    window.Capacitor = {
+      isNativePlatform: () => true,
+      Plugins: { AdMob: {
+        initialize: async () => {},
+        requestConsentInfo: async () => ({}),
+        addListener: async (name, listener) => {
+          if (name !== 'onRewardedVideoAdReward') throw new Error('unexpected AdMob event: ' + name);
+          window.__rewardBridgeMock.listener = listener;
+          return { remove: () => { window.__rewardBridgeMock.listener = null; } };
+        },
+        prepareRewardVideoAd: async () => {},
+        showRewardVideoAd: async () => {
+          const mock = window.__rewardBridgeMock;
+          mock.shows++;
+          if (mock.phase === 'earned') mock.listener({ amount: 3, type: 'undo' });
+          return null;
+        }
+      } }
+    };
+    window.__ballSort.startLevel(1, {
+      level: 1, tubes: [[0], [1, 1, 1], [], [], []], history: [[0, 1, 2]],
+      undos: 0, extraUsed: false, moves: 1
+    });
+  });
+  await page.addScriptTag({ path: path.join(__dirname, '..', 'www', 'js', 'ads.js') });
+  const nativePendingUndo = await snapshotProgress();
+  await page.click('#btn-undo');
+  await page.waitForFunction(() => window.__rewardBridgeMock.shows === 1 && window.__rewardBridgeMock.listener === null);
+  await sleep(50);
+  const afterUnearned = await snapshotProgress();
+  if (JSON.stringify(afterUnearned) !== JSON.stringify(nativePendingUndo)) {
+    throw new Error('mock native dismissal without an earned event changed undo credits or the pending move');
+  }
+  await page.evaluate(() => { window.__rewardBridgeMock.phase = 'earned'; });
+  await page.click('#btn-undo');
+  await page.waitForFunction(() => window.__ballSort.state.undos === 3 && window.__rewardBridgeMock.listener === null);
+  const mockEarnedUndo = await snapshotProgress();
+  if (JSON.stringify(mockEarnedUndo.tubes) !== JSON.stringify(nativePendingUndo.tubes) ||
+      JSON.stringify(mockEarnedUndo.history) !== JSON.stringify(nativePendingUndo.history) ||
+      mockEarnedUndo.moves !== nativePendingUndo.moves || mockEarnedUndo.undos !== 3) {
+    throw new Error('mock earned native event did not grant credits without undoing the pending move');
+  }
+  console.log('mock native reward event gates undo credits: dismissal grants none, earned event grants three');
+
+  await browser.close();
+  browser = await launchBrowser();
+  await openTestPage();
+  await page.goto(URL, { waitUntil: 'networkidle0' });
+  await sleep(100);
+  const afterChromeRestart = await snapshotProgress();
+  if (JSON.stringify(afterChromeRestart) !== JSON.stringify(mockEarnedUndo)) {
+    throw new Error('mock-earned undo state did not survive a fresh Chromium process using the same disk profile');
+  }
+  console.log('mock-earned undo state survived a fresh Chromium process and persistent browser profile');
+
   // harder levels, solved purely by taps; screenshot mid-game with a selection
   for (const L of [12, 30]) {
     await page.goto(URL + '?level=' + L, { waitUntil: 'networkidle0' }); await sleep(300);
@@ -346,8 +417,11 @@ let browser = null;
   if (errors.length) throw new Error('Console errors: ' + errors.join('; '));
   console.log('ALL BROWSER TESTS PASSED');
   await browser.close();
+  browser = null;
+  fs.rmSync(PROFILE, { recursive: true, force: true });
 })().catch(async e => {
   console.error('FAIL', e);
   if (browser) await browser.close().catch(() => {});
+  fs.rmSync(PROFILE, { recursive: true, force: true });
   process.exitCode = 1;
 });
