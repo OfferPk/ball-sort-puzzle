@@ -221,8 +221,10 @@ let browser = null;
     history: window.__ballSort.state.history,
     undos: window.__ballSort.state.undos,
     moves: window.__ballSort.state.moves,
+    extraUsed: window.__ballSort.state.extraUsed,
     hudMoves: document.getElementById('moves').textContent,
-    undoDisabled: document.getElementById('btn-undo').disabled
+    undoDisabled: document.getElementById('btn-undo').disabled,
+    tubeButtonDisabled: document.getElementById('btn-tube').disabled
   }));
   const before = await snapshotProgress();
   await tap(0); await tap(1); await waitIdle();
@@ -246,12 +248,53 @@ let browser = null;
   await page.evaluate(() => window.__ballSort.startLevel(2));
   const n0 = await page.evaluate(() => window.__ballSort.state.tubes.length);
   await page.click('#btn-tube'); await sleep(100);
-  const n1 = await page.evaluate(() => window.__ballSort.state.tubes.length);
-  if (n1 !== n0 + 1) throw new Error('extra tube failed');
-  console.log('+1 tube (web: reward granted instantly):', n0, '->', n1);
+  const extraTube = await snapshotProgress();
+  if (extraTube.tubes.length !== n0 + 1 || !extraTube.extraUsed || !extraTube.tubeButtonDisabled) {
+    throw new Error('extra tube was not granted and marked as used');
+  }
+  await page.reload({ waitUntil: 'networkidle0' });
+  const restoredExtraTube = await snapshotProgress();
+  if (JSON.stringify(restoredExtraTube) !== JSON.stringify(extraTube)) {
+    throw new Error('extra tube or its used flag did not survive reload');
+  }
+  console.log('extra tube and one-use flag survive reload and keep the control disabled');
   await solveCurrent();
   await sleep(600);
   console.log('level 2 solved with extra tube');
+  await page.click('#btn-next'); await sleep(300);
+
+  // Rewarded undo grants credits without undoing the move; both the grant and
+  // a later credit-consuming undo must persist across reloads.
+  await page.evaluate(() => window.__ballSort.startLevel(1, {
+    level: 1, tubes: [[0], [1, 1, 1], [], [], []], history: [[0, 1, 2]],
+    undos: 0, extraUsed: false, moves: 1
+  }));
+  await page.click('#btn-undo');
+  await page.waitForFunction(() => window.__ballSort.state.undos === 3, { timeout: 5000 });
+  const rewardedUndo = await snapshotProgress();
+  if (JSON.stringify(rewardedUndo.tubes) !== JSON.stringify([[0], [1, 1, 1], [], [], []]) ||
+      JSON.stringify(rewardedUndo.history) !== JSON.stringify([[0, 1, 2]]) ||
+      rewardedUndo.moves !== 1 || rewardedUndo.undos !== 3 || rewardedUndo.undoDisabled) {
+    throw new Error('rewarded undo did not grant three credits while preserving the pending move');
+  }
+  await page.reload({ waitUntil: 'networkidle0' });
+  const restoredReward = await snapshotProgress();
+  if (JSON.stringify(restoredReward) !== JSON.stringify(rewardedUndo)) {
+    throw new Error('rewarded undo credits or pending move did not survive reload');
+  }
+  await page.click('#btn-undo'); await sleep(100);
+  const rewardedUndoUsed = await snapshotProgress();
+  if (JSON.stringify(rewardedUndoUsed.tubes) !== JSON.stringify([[0, 1, 1], [1], [], [], []]) ||
+      rewardedUndoUsed.history.length !== 0 || rewardedUndoUsed.moves !== 0 ||
+      rewardedUndoUsed.undos !== 2 || !rewardedUndoUsed.undoDisabled) {
+    throw new Error('undo did not consume one rewarded credit and restore the prior board');
+  }
+  await page.reload({ waitUntil: 'networkidle0' });
+  const restoredRewardedUndo = await snapshotProgress();
+  if (JSON.stringify(restoredRewardedUndo) !== JSON.stringify(rewardedUndoUsed)) {
+    throw new Error('remaining rewarded undo credits or undone board did not survive reload');
+  }
+  console.log('rewarded undo grant and one-credit undo persist across reloads');
 
   // harder levels, solved purely by taps; screenshot mid-game with a selection
   for (const L of [12, 30]) {
