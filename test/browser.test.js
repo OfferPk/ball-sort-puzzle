@@ -436,6 +436,32 @@ async function openTestPage() {
   }
   await assertTubeAccessibility('touch move after destination preview');
   console.log('touch destination previews announce and mark legal moves, update on source switch, clear on cancel, and preserve saves until a pour');
+  // Long source/destination feedback must stay fully visible on narrow phones.
+  await page.setViewport({ width: 320, height: 480, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await page.evaluate(() => window.__ballSort.startLevel(1, {
+    level: 1, tubes: [[0, 1], [1], [], [2, 2, 2, 2], [0, 0]],
+    history: [], undos: 3, extraUsed: false, moves: 0
+  }));
+  await page.waitForSelector('.tube[data-index="0"]', { visible: true });
+  await tap(0);
+  const narrowSelectionToast = await page.$eval('#toast', element => {
+    const rect = element.getBoundingClientRect();
+    return {
+      text: element.textContent, role: element.getAttribute('role'),
+      left: rect.left, right: rect.right, width: rect.width,
+      scrollWidth: element.scrollWidth, clientWidth: element.clientWidth,
+      viewportWidth: innerWidth, whiteSpace: getComputedStyle(element).whiteSpace
+    };
+  });
+  if (narrowSelectionToast.text !== 'Blue selected. Legal destinations: Tube 2 and Tube 3.' ||
+      narrowSelectionToast.role !== 'status' || narrowSelectionToast.left < 12 ||
+      narrowSelectionToast.right > narrowSelectionToast.viewportWidth - 12 ||
+      narrowSelectionToast.scrollWidth > narrowSelectionToast.clientWidth ||
+      narrowSelectionToast.whiteSpace === 'nowrap') {
+    throw new Error('source/destination feedback is clipped at 320px: ' + JSON.stringify(narrowSelectionToast));
+  }
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await page.waitForSelector('.tube[data-index="0"]', { visible: true });
 
   // Tapping a completed tube as a destination explains why the pour failed,
   // while keeping the source selected and preserving the in-progress save.
