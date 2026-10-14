@@ -36,6 +36,15 @@ A polished, relaxing **color-sorting puzzle** that works fully **offline**. It's
 - Portrait, touch-first layout that respects safe areas and adapts to 1–3 rows of tubes.
 - No build step: open `www/index.html` or serve the folder.
 
+### v1.1 extras (`www/js/metakit.js` + `www/js/meta-config.js`, separate save `ballsort.meta.v1`)
+
+- **How-to card** on first launch and a skippable **first-level tutorial** (both replayable from Settings).
+- **Daily reward** (7-day streak calendar) and a seeded **Daily challenge** (same for everyone each day).
+- **Skin Shop**: ball finishes (surface only, the hue never changes, so colour-blind play is unaffected) and backgrounds. Tap to preview; a rewarded ad (only from a tap) unlocks a 24 h trial.
+- **Achievements + Stats**.
+- **Accessibility**: reduce motion (follows the OS until changed), larger text, high contrast, numbered colour symbols.
+- Coins are **cosmetic only**: earned by playing, never sold, never cashed out; no loot boxes, no betting.
+
 ## Project layout
 
 ```
@@ -74,7 +83,7 @@ node test/browser.test.js http://localhost:8080/ /tmp   # needs Chrome at /usr/b
 | Hook | When | In a browser |
 |---|---|---|
 | `Ads.showBanner()` | on start (adaptive banner, bottom) | no-op |
-| `Ads.showInterstitial()` | after every **3** completed levels, **at most once per 60 s** | no-op |
+| `Ads.showInterstitial()` | only from *Next Level*: never on launch/exit or in the player's first session (`www/js/adgate.js`: 2nd+ session and 5+ levels finished), then every **3** levels, **at most once per 60 s** | no-op |
 | `Ads.showRewarded(onReward)` | extra undos, +1 tube | grants the reward immediately |
 
 Inside the Android app they call [`@capacitor-community/admob`](https://github.com/capacitor-community/admob), which also shows Google's UMP consent form when it's required (EEA/UK).
@@ -124,8 +133,11 @@ Or open `android/` in Android Studio (`npx cap open android`).
 
 ## Releasing to Google Play
 
+Use the on-demand **Play Store build** workflow and follow [`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md): real AdMob IDs come from repository secrets, and the release build fails if any test or placeholder ID would ship. The manual steps below still apply.
+
+
 1. Bump `versionCode` (+1 every upload) and `versionName` in `android/app/build.gradle`, and switch to your real AdMob IDs (see above).
-2. Commit, then tag and push: `git tag v1.0.1 && git push origin v1.0.1`. CI attaches `ball-sort-puzzle-v1.0.1.aab` and `.apk` to a GitHub Release.
+2. Commit, then tag and push: `git tag v1.1.0 && git push origin v1.1.0`. CI attaches `ball-sort-puzzle-v1.1.0.aab` and `.apk` to a GitHub Release.
 3. In [Play Console](https://play.google.com/console), create the app (package `com.offerpk.ballsort`) and enable **Play App Signing**. Your CI keystore is the **upload key**.
 4. Fill in the store listing: the 512×512 icon is at `assets/play-store-icon-512.png`, and you'll also need a 1024×500 feature graphic and phone screenshots (see `docs/`).
 5. **App content**: enter the privacy policy URL `https://offerpk.github.io/ball-sort-puzzle/privacy.html`, declare **Contains ads = Yes**, answer the **Advertising ID** declaration (yes, used by AdMob for advertising), and complete the Data safety form, content rating, and target audience.

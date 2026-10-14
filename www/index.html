@@ -8,7 +8,8 @@
   <title>Ball Sort Puzzle</title>
   <link rel="icon" type="image/png" href="icon.png" />
   <link rel="apple-touch-icon" href="icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=color-symbols-20260930" />
+  <link rel="stylesheet" href="css/style.css?v=110" />
+  <link rel="stylesheet" href="css/meta.css?v=110" />
 </head>
 <body>
   <div id="app">
@@ -56,6 +57,7 @@
       <h2 id="win-title">Level Complete!</h2>
       <p id="win-sub">Solved in 0 moves</p>
       <p id="win-stars" class="win-stars" role="status" aria-live="polite" aria-atomic="true"></p>
+      <p id="win-coins" class="win-coins"></p>
       <p id="next-challenge" class="next-challenge"></p>
       <button class="big-btn" id="btn-next">Next Level ▸</button>
       <button class="small-btn replay-btn" id="btn-replay" type="button">Replay Level</button>
@@ -86,14 +88,26 @@
         <a class="small-btn" href="privacy.html" target="_blank" rel="noopener">Privacy</a>
       </div>
       <button class="big-btn" id="btn-close-settings">Done</button>
-      <p class="version">Ball Sort Puzzle v1.0.1</p>
+      <p class="version">Ball Sort Puzzle v1.1.0</p>
     </div>
   </div>
 
+  <div id="sr-live" class="sr-only" aria-live="polite"></div>
+  <script src="js/sr.js"></script>
+  <script src="js/a11y.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/ads-config.js"></script>
+  <script src="js/adgate.js"></script>
   <script src="js/ads.js"></script>
   <script src="js/sound.js"></script>
-  <script src="js/game.js?v=color-symbols-20260930"></script>
+  <script src="js/game.js?v=110"></script>
+  <script src="js/shopcore.js"></script>
+  <script src="js/daily.js"></script>
+  <script src="js/achievements.js"></script>
+  <script src="js/coach.js"></script>
+  <script src="js/review.js"></script>
+  <script src="js/ach-defs.js"></script>
+  <script src="js/metakit.js"></script>
+  <script src="js/meta-config.js"></script>
 </body>
 </html>

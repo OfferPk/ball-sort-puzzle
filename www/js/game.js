@@ -90,6 +90,7 @@
     state.selected = -1;
     state.won = false;
     state.busy = false;
+    state.undoUsed = false;
     $('next-challenge').textContent = '';
     var lv = L.generateLevel(level);
     state.moveTargets = lv.moveTargets || null;
@@ -403,6 +404,7 @@
       L.pour(state.tubes, from, to, CAP);
       state.history.push([from, to, n]);
       state.moves++;
+      if (window.Meta) window.Meta.move();
       render();
       flies.forEach(function (f) { f.remove(); });
       Sound.drop(); buzz(10);
@@ -441,6 +443,7 @@
     var m = state.history.pop();
     for (var k = 0; k < m[2]; k++) state.tubes[m[0]].push(state.tubes[m[1]].pop());
     state.undos--;
+    state.undoUsed = true;
     state.moves = Math.max(0, state.moves - 1);
     render(); Sound.click(); save();
   }
@@ -576,6 +579,10 @@
     Sound.win(); buzz(40);
     $('win-title').textContent = 'Level ' + state.level + ' Complete!';
     showModal('win');
+    if (window.Meta) {
+      var gained = window.Meta.win({ level: state.level, moves: state.moves, stars: earnedStars, clean: !state.undoUsed && !state.extraUsed });
+      $('win-coins').textContent = gained ? '+' + gained + ' coins' : '';
+    }
     confetti();
   }
 
@@ -740,7 +747,8 @@
   });
 
   // Test / debug hook (used by the headless test)
-  window.__ballSort = { state: state, startLevel: startLevel, onTube: onTube, undo: undo, addTube: addTube, logic: L };
+  window.__ballSort = { state: state, startLevel: startLevel, onTube: onTube, undo: undo, addTube: addTube, logic: L,
+    toast: toast, hideModal: hideModal, activeModal: function () { return activeModal; }, render: function () { render(); } };
 
   var saved = load();
   if (saved && saved.settings) state.settings = Object.assign(state.settings, saved.settings);

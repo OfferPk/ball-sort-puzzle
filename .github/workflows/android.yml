@@ -34,8 +34,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Game logic tests
-        run: node test/logic.test.js
+      - name: Tests (logic, ads, meta, store guard)
+        run: npm test
 
       - name: Capacitor sync
         run: npx cap sync android

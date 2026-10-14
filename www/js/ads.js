@@ -49,8 +49,10 @@
     } catch (e) { console.warn('banner failed', e); }
   }
 
-  /** Call after every completed level. Shows an interstitial every N levels, max once per 60 s. */
+  /** Call ONLY after a completed level. Never on launch/exit or in the first session (AdGate);
+   *  then at most every N levels and once per 60 s. */
   async function showInterstitial() {
+    if (window.AdGate) { window.AdGate.levelDone(); if (!window.AdGate.allow()) return false; }
     levelsSinceInterstitial++;
     var now = Date.now();
     if (levelsSinceInterstitial < (cfg.INTERSTITIAL_EVERY_N_LEVELS || 3)) return false;

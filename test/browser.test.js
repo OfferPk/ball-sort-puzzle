@@ -20,6 +20,8 @@ async function openTestPage() {
   page = await browser.newPage();
   await page.emulate({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
     userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Mobile Safari/537.36' });
+  // v1.1 onboarding (how-to card + first-level coach) is covered by test/meta.browser.test.js; mark it seen here.
+  await page.evaluateOnNewDocument(() => { try { localStorage.setItem('ballsort.meta.v1.howto', '1'); localStorage.setItem('ballsort.meta.v1.coach', '1'); } catch (e) {} });
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   return page;
@@ -1079,7 +1081,7 @@ async function openTestPage() {
   if (!/Touch: Tap a tube to select it, then tap another tube to pour\./.test(howToPlay) || !/Keyboard: Focus a tube, use the arrow keys.*Enter or Space/.test(howToPlay) || !/Accessibility: Each tube's name gives its number, ball colors, and contents; its selected state is exposed through the button's pressed state\./.test(howToPlay) || !/Hint: Shows one recommended legal move without changing the board\./.test(howToPlay) || !/Levels: Tap the level number to revisit any unlocked level\./.test(howToPlay)) throw new Error('How to play instructions are missing touch, keyboard, accessibility, hint, or level-picker guidance');
   await page.keyboard.press('ArrowRight');
   if ((await page.evaluate(() => document.activeElement.id)) !== 'opt-sound') throw new Error('tube arrow navigation interfered with settings dialog focus');
-  for (const id of ['opt-vibrate', 'opt-symbols', 'btn-reset']) {
+  for (const id of ['opt-vibrate', 'opt-symbols', 'set-motion', 'set-large', 'set-contrast', 'btn-howto-again', 'btn-tour-again', 'btn-reset']) {
     await page.keyboard.press('Tab');
     if ((await page.evaluate(() => document.activeElement.id)) !== id) throw new Error('settings Tab order did not reach ' + id);
   }
