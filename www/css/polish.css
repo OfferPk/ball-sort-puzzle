@@ -1,0 +1,120 @@
+/* Focused visual polish for the game's overlays and modal cards. */
+.overlay {
+  padding: clamp(16px, 5vw, 28px);
+  background: rgba(5, 10, 24, .72);
+  -webkit-backdrop-filter: blur(8px) saturate(115%);
+  backdrop-filter: blur(8px) saturate(115%);
+}
+
+.overlay .card {
+  width: min(380px, 100%);
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(20px, 6vw, 28px);
+  border: 1px solid rgba(207, 226, 255, .22);
+  border-radius: 24px;
+  background: linear-gradient(155deg, #20314f 0%, #182743 52%, #111c34 100%);
+  box-shadow: 0 26px 68px rgba(0, 0, 0, .52),
+    0 1px 0 rgba(255, 255, 255, .12) inset;
+}
+
+.overlay .card h2 {
+  color: #f6f8ff;
+  font-size: clamp(21px, 5.8vw, 26px);
+  letter-spacing: -.02em;
+}
+
+.overlay .card .help {
+  color: #c7d3e8;
+  opacity: 1;
+}
+
+.overlay .level-card {
+  width: min(400px, 100%);
+  overflow: hidden;
+}
+
+.level-grid {
+  gap: 9px;
+  margin: 14px 0 16px;
+}
+
+.level-option {
+  min-height: 48px;
+  border-radius: 14px;
+  background: rgba(205, 222, 250, .09);
+  border-color: rgba(205, 222, 250, .17);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset;
+  transition: transform .14s ease, background-color .14s ease,
+    border-color .14s ease, box-shadow .14s ease;
+}
+
+.level-option:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(205, 222, 250, .15);
+  border-color: rgba(205, 222, 250, .34);
+}
+
+.level-option.current {
+  color: #3d2b09;
+  background: linear-gradient(155deg, #ffe19a, #ffc95b);
+  border-color: #ffe8b5;
+  box-shadow: 0 4px 12px rgba(255, 193, 76, .2),
+    0 1px 0 rgba(255, 255, 255, .52) inset;
+}
+
+.level-option.current .level-option-stars {
+  color: #74510b;
+}
+
+.overlay .big-btn {
+  border-radius: 16px;
+  box-shadow: 0 5px 0 #bf772f, 0 10px 22px rgba(0, 0, 0, .28),
+    0 1px 0 rgba(255, 255, 255, .35) inset;
+  transition: transform .12s ease, filter .12s ease;
+}
+
+.overlay .big-btn:hover {
+  filter: brightness(1.05) saturate(1.04);
+}
+
+.overlay .small-btn {
+  border-color: rgba(207, 226, 255, .19);
+  background: rgba(205, 222, 250, .08);
+  transition: background-color .14s ease, border-color .14s ease;
+}
+
+.overlay .small-btn:hover {
+  background: rgba(205, 222, 250, .14);
+  border-color: rgba(207, 226, 255, .34);
+}
+
+.overlay :is(.big-btn, .small-btn, .level-option, .switch):focus-visible {
+  outline: 3px solid #ffe29a;
+  outline-offset: 3px;
+}
+
+@media (max-width: 380px) {
+  .overlay { padding: 14px; }
+  .overlay .card { border-radius: 21px; }
+  .level-grid { gap: 6px; }
+}
+
+@media (max-height: 640px) {
+  .overlay { padding-block: 10px; }
+  .overlay .card { max-height: 92vh; }
+  .win-card .trophy { font-size: 52px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .overlay .card,
+  .overlay .card .trophy,
+  .level-option,
+  .overlay .big-btn,
+  .overlay .small-btn {
+    animation: none !important;
+    transition: none !important;
+  }
+}
